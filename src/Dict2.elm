@@ -157,6 +157,11 @@ a collision.
 -}
 insert : comparable -> v -> Dict comparable v -> Dict comparable v
 insert key value dict =
+    turnBlack <| insertHelp key value dict
+
+
+insertHelp : comparable -> v -> Dict comparable v -> Dict comparable v
+insertHelp key value dict =
     case dict of
         Leaf ->
             Node True key value Leaf Leaf
@@ -167,10 +172,10 @@ insert key value dict =
                     Node isRed key value left right
 
                 LT ->
-                    balanceLeft isRed nodeKey nodeValue (insert key value left) right
+                    balanceLeft isRed nodeKey nodeValue (insertHelp key value left) right
 
                 GT ->
-                    balanceRight isRed nodeKey nodeValue left (insert key value right)
+                    balanceRight isRed nodeKey nodeValue left (insertHelp key value right)
 
 
 {-| Remove a key-value pair from a dictionary. If the key is not found,
@@ -178,6 +183,11 @@ no changes are made.
 -}
 remove : comparable -> Dict comparable v -> Dict comparable v
 remove key dict =
+    turnBlack <| removeHelp key dict
+
+
+removeHelp : comparable -> Dict comparable v -> Dict comparable v
+removeHelp key dict =
     dict
 
 
@@ -200,13 +210,13 @@ update key alter dict =
 balanceLeft : Bool -> k -> v -> Dict k v -> Dict k v -> Dict k v
 balanceLeft isRed key value left right =
     case ( isRed, left ) of
-        ( False, Node True aKey aValue (Node True bKey bValue bLeft bRight) aRight ) ->
+        ( False, Node True lKey lValue ((Node True _ _ _ _) as lLeft) lRight ) ->
             Node
                 True
-                aKey
-                aValue
-                (Node False bKey bValue bLeft bRight)
-                (Node False key value aRight right)
+                lKey
+                lValue
+                (turnBlack lLeft)
+                (Node False key value lRight right)
 
         _ ->
             Node isRed key value left right
@@ -217,24 +227,24 @@ balanceRight isRed key value left right =
     case right of
         Node True rKey rValue rLeft rRight ->
             case left of
-                Node True lKey lValue lLeft lRight ->
-                    Node
-                        True
-                        key
-                        value
-                        (Node False lKey lValue lLeft lRight)
-                        (Node False rKey rValue rLeft rRight)
+                Node True _ _ _ _ ->
+                    Node True key value (turnBlack left) (turnBlack right)
 
                 _ ->
-                    Node
-                        isRed
-                        rKey
-                        rValue
-                        (Node True key value left rLeft)
-                        rRight
+                    Node isRed rKey rValue (Node True key value left rLeft) rRight
 
         _ ->
             Node isRed key value left right
+
+
+turnBlack : Dict k v -> Dict k v
+turnBlack dict =
+    case dict of
+        Leaf ->
+            Leaf
+
+        Node _ key value left right ->
+            Node False key value left right
 
 
 
