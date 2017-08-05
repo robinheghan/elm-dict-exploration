@@ -27,12 +27,12 @@ suite n =
             Dict2.fromList ls
     in
         describe (toString n ++ " elements")
-            [ Benchmark.compare "Singleton"
+            [ Benchmark.compare "Get"
+                (benchmark2 "Original" Dict.get 0 original)
+                (benchmark2 "Updated" Dict2.get 0 updated)
+            , Benchmark.compare "Singleton"
                 (benchmark2 "Original" Dict.singleton n n)
                 (benchmark2 "Updated" Dict2.singleton n n)
-            , Benchmark.compare "Size"
-                (benchmark1 "Original" Dict.size original)
-                (benchmark1 "Updated" Dict2.size updated)
             , Benchmark.compare "Filter"
                 (benchmark2 "Original" Dict.filter (\_ v -> v < halfwayPoint) original)
                 (benchmark2 "Updated" Dict2.filter (\_ v -> v < halfwayPoint) updated)

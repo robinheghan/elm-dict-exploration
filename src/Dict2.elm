@@ -109,7 +109,17 @@ singleton key value =
 -}
 size : Dict k v -> Int
 size dict =
-    foldl (\_ _ acc -> acc + 1) 0 dict
+    sizeHelp 0 dict
+
+
+sizeHelp : Int -> Dict k v -> Int
+sizeHelp n dict =
+    case dict of
+        Leaf ->
+            n
+
+        Node _ _ _ left right ->
+            sizeHelp (sizeHelp (n + 1) right) left
 
 
 {-| Get the value associated with a key. If the key is not found, return
