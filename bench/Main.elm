@@ -1,7 +1,7 @@
 module Main exposing (main)
 
 import Benchmark.Runner exposing (BenchmarkProgram, program)
-import Benchmark exposing (Benchmark, describe, benchmark1, benchmark2, benchmark3)
+import Benchmark exposing (Benchmark, describe, benchmark1, benchmark2, benchmark3, benchmark4)
 import Dict
 import Dict2
 
@@ -18,7 +18,12 @@ suite n =
             n // 2
 
         ls =
-            List.indexedMap (,) (List.range 0 n)
+            List.map3
+                (\a b c -> [ a, b, c ])
+                (List.indexedMap (,) (List.range 0 50))
+                (List.indexedMap (,) (List.range 25 75 |> List.reverse))
+                (List.indexedMap (,) (List.range 51 100))
+                |> List.concat
 
         original =
             Dict.fromList ls
@@ -26,23 +31,46 @@ suite n =
         updated =
             Dict2.fromList ls
 
-        chosenIndex =
-            -1
+        keys =
+            List.map (\( k, v ) -> k) ls
     in
         describe (toString n ++ " elements")
             [ Benchmark.compare "Get"
-                (benchmark2 "Original" Dict.get chosenIndex original)
-                (benchmark2 "Updated" Dict2.get chosenIndex updated)
+                (benchmark3 "Original" getter Dict.get keys original)
+                (benchmark3 "Updated" getter Dict2.get keys updated)
             , Benchmark.compare "Insert"
-                (benchmark3 "Original" Dict.insert chosenIndex -1 original)
-                (benchmark3 "Updated" Dict2.insert chosenIndex -1 updated)
-            , Benchmark.compare "Update insert"
-                (benchmark3 "Original" Dict.update chosenIndex (always <| Just -1) original)
-                (benchmark3 "Updated" Dict2.update chosenIndex (always <| Just -1) updated)
+                (benchmark1 "Original" Dict.fromList ls)
+                (benchmark1 "Updated" Dict2.fromList ls)
             , Benchmark.compare "Remove"
-                (benchmark2 "Original" Dict.remove chosenIndex original)
-                (benchmark2 "Updated" Dict2.remove chosenIndex updated)
+                (benchmark3 "Original" remover Dict.remove keys original)
+                (benchmark3 "Updated" remover Dict2.remove keys updated)
+            , Benchmark.compare "Remove one item"
+                (benchmark3 "Original" singleRemover Dict.remove keys original)
+                (benchmark3 "Updated" singleRemover Dict2.remove keys updated)
+            , Benchmark.compare "Update insert"
+                (benchmark4 "Original" updater Dict.update (\_ -> Just -1) keys original)
+                (benchmark4 "Updated" updater Dict2.update (\_ -> Just -1) keys updated)
             , Benchmark.compare "Update remove"
-                (benchmark3 "Original" Dict.update chosenIndex (always Nothing) original)
-                (benchmark3 "Updated" Dict2.update chosenIndex (always Nothing) updated)
+                (benchmark4 "Original" updater Dict.update (\_ -> Nothing) keys original)
+                (benchmark4 "Updated" updater Dict2.update (\_ -> Nothing) keys updated)
             ]
+
+
+getter : (a -> b -> c) -> List a -> b -> List c
+getter f keys dict =
+    List.foldl (\k acc -> f k dict :: acc) [] keys
+
+
+updater : (a -> b -> c -> c) -> b -> List a -> c -> c
+updater f1 f2 keys dict =
+    List.foldl (\k acc -> f1 k f2 acc) dict keys
+
+
+remover : (a -> b -> b) -> List a -> b -> b
+remover f keys dict =
+    List.foldl (\k acc -> f k acc) dict keys
+
+
+singleRemover : (a -> b -> c) -> List a -> b -> List c
+singleRemover f keys dict =
+    List.foldl (\k acc -> f k dict :: acc) [] keys
