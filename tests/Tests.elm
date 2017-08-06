@@ -1,16 +1,30 @@
 module Tests exposing (tests)
 
 import Basics exposing (..)
-import Dict2 as Dict
+import Dict as BaseDict
+import Dict2 as Dict exposing (Dict)
 import List
 import Maybe exposing (..)
 import Test exposing (..)
+import Fuzz exposing (Fuzzer)
 import Expect
 
 
 animals : Dict.Dict String String
 animals =
     Dict.fromList [ ( "Tom", "cat" ), ( "Jerry", "mouse" ) ]
+
+
+fuzzPairs : Fuzzer (List ( Int, Int ))
+fuzzPairs =
+    ( Fuzz.int, Fuzz.int )
+        |> Fuzz.tuple
+        |> Fuzz.list
+
+
+fuzzDict : Fuzzer (Dict Int Int)
+fuzzDict =
+    Fuzz.map Dict.fromList fuzzPairs
 
 
 tests : Test
@@ -97,6 +111,22 @@ tests =
                             Expect.equal bExpected
                                 ((Dict.merge Dict.insert insertBoth Dict.insert b1 b2 Dict.empty) |> Dict.toList)
                     ]
+
+        fuzzTests =
+            describe "Fuzz tests"
+                [ fuzz fuzzPairs "Converting to/from list works" <|
+                    \pairs ->
+                        Dict.toList (Dict.fromList pairs)
+                            |> Expect.equal (BaseDict.toList (BaseDict.fromList pairs))
+                , fuzz2 fuzzPairs Fuzz.int "Insert works" <|
+                    \pairs num ->
+                        Dict.toList (Dict.insert num num (Dict.fromList pairs))
+                            |> Expect.equal (BaseDict.toList (BaseDict.insert num num (BaseDict.fromList pairs)))
+                , fuzz2 fuzzPairs Fuzz.int "Removal works" <|
+                    \pairs num ->
+                        Dict.toList (Dict.remove num (Dict.fromList pairs))
+                            |> Expect.equal (BaseDict.toList (BaseDict.remove num (BaseDict.fromList pairs)))
+                ]
     in
         describe "Dict Tests"
             [ buildTests
@@ -104,4 +134,5 @@ tests =
             , combineTests
             , transformTests
             , mergeTests
+            , fuzzTests
             ]
