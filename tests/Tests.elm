@@ -17,7 +17,7 @@ animals =
 
 fuzzPairs : Fuzzer (List ( Int, Int ))
 fuzzPairs =
-    ( Fuzz.int, Fuzz.int )
+    ( Fuzz.int, Fuzz.constant 0 )
         |> Fuzz.tuple
         |> Fuzz.list
 
