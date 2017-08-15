@@ -126,6 +126,14 @@ tests =
                     \pairs num ->
                         Dict.toList (Dict.remove num (Dict.fromList pairs))
                             |> Expect.equal (BaseDict.toList (BaseDict.remove num (BaseDict.fromList pairs)))
+                , fuzz2 fuzzPairs Fuzz.int "Insert maintains invariant" <|
+                    \pairs num ->
+                        Dict.validateInvariants (Dict.insert num num (Dict.fromList pairs))
+                            |> Expect.equal ""
+                , fuzz2 fuzzPairs Fuzz.int "Remove maintains invariant" <|
+                    \pairs num ->
+                        Dict.validateInvariants (Dict.remove num (Dict.fromList pairs))
+                            |> Expect.equal ""
                 ]
     in
         describe "Dict Tests"

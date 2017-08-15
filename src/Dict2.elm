@@ -23,6 +23,7 @@ module Dict2
         , values
         , toList
         , fromList
+        , validateInvariants
         )
 
 {-| A dictionary mapping unique keys to values. The keys can be any comparable
@@ -354,6 +355,101 @@ update key alter dict =
 -- HELPERS
 
 
+validateInvariants : Dict k v -> String
+validateInvariants dict =
+    case dict of
+        Leaf ->
+            ""
+
+        Node False _ _ left right ->
+            let
+                error =
+                    validateInvariantsHelp dict
+
+                blackHeightLeft =
+                    blackHeight left
+
+                blackHeightRight =
+                    blackHeight right
+            in
+                if error /= "" then
+                    error
+                else if blackHeightLeft /= blackHeightRight then
+                    "Black left(" ++ toString blackHeightLeft ++ ") /= Black right(" ++ toString blackHeightRight ++ ")"
+                else
+                    ""
+
+        _ ->
+            "Root node should be black!"
+
+
+validateInvariantsHelp : Dict k v -> String
+validateInvariantsHelp dict =
+    let
+        testChildren : Dict k v -> Dict k v -> String
+        testChildren left right =
+            let
+                leftError =
+                    validateInvariantsHelp left
+            in
+                if leftError == "" then
+                    validateInvariantsHelp right
+                else
+                    leftError
+    in
+        case dict of
+            -- Red nodes always have two black children
+            Node True _ _ left right ->
+                if isBlack left && isBlack right then
+                    testChildren left right
+                else
+                    "Red nodes should have two black children!"
+
+            -- Right children should not exist
+            Node _ _ _ _ (Node True _ _ _ _) ->
+                "Right should not exist!"
+
+            -- Left and Right node has to maintain invariants as well
+            Node _ _ _ left right ->
+                testChildren left right
+
+            -- If we've reached a leaf we're done
+            Leaf ->
+                ""
+
+
+blackHeight : Dict k v -> Int
+blackHeight dict =
+    let
+        helper : Int -> Dict k v -> Int
+        helper acc node =
+            case node of
+                Leaf ->
+                    acc + 1
+
+                Node isRed _ _ left right ->
+                    let
+                        newAcc =
+                            if isRed then
+                                acc
+                            else
+                                acc + 1
+                    in
+                        max (helper newAcc left) (helper newAcc right)
+    in
+        helper 0 dict
+
+
+isBlack : Dict k v -> Bool
+isBlack dict =
+    case dict of
+        Leaf ->
+            True
+
+        Node isRed _ _ _ _ ->
+            not isRed
+
+
 balanceLeft : Bool -> k -> v -> Dict k v -> Dict k v -> Dict k v
 balanceLeft isRed key value left right =
     case ( isRed, left ) of
@@ -484,8 +580,14 @@ colorFlip dict =
 deleteMin : Dict k v -> Dict k v
 deleteMin dict =
     case dict of
+        Leaf ->
+            Leaf
+
         Node isRed key value left right ->
             case left of
+                Leaf ->
+                    Leaf
+
                 Node False _ _ (Node False _ _ _ _) _ ->
                     case moveRedLeft dict of
                         Node isRed key value left right ->
@@ -494,14 +596,8 @@ deleteMin dict =
                         Leaf ->
                             Leaf
 
-                Leaf ->
-                    Leaf
-
                 _ ->
                     balanceLeft isRed key value (deleteMin left) right
-
-        Leaf ->
-            Leaf
 
 
 getMin : Dict k v -> Dict k v
