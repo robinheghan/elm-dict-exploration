@@ -15,9 +15,14 @@ animals =
     Dict.fromList [ ( "Tom", "cat" ), ( "Jerry", "mouse" ) ]
 
 
+pairRange : Fuzzer Int
+pairRange =
+    Fuzz.intRange 0 1000
+
+
 fuzzPairs : Fuzzer (List ( Int, Int ))
 fuzzPairs =
-    ( Fuzz.int, Fuzz.constant 0 )
+    ( pairRange, Fuzz.constant 0 )
         |> Fuzz.tuple
         |> Fuzz.list
 
@@ -118,19 +123,19 @@ tests =
                     \pairs ->
                         Dict.toList (Dict.fromList pairs)
                             |> Expect.equal (BaseDict.toList (BaseDict.fromList pairs))
-                , fuzz2 fuzzPairs Fuzz.int "Insert works" <|
+                , fuzz2 fuzzPairs pairRange "Insert works" <|
                     \pairs num ->
                         Dict.toList (Dict.insert num num (Dict.fromList pairs))
                             |> Expect.equal (BaseDict.toList (BaseDict.insert num num (BaseDict.fromList pairs)))
-                , fuzz2 fuzzPairs Fuzz.int "Removal works" <|
+                , fuzz2 fuzzPairs pairRange "Removal works" <|
                     \pairs num ->
                         Dict.toList (Dict.remove num (Dict.fromList pairs))
                             |> Expect.equal (BaseDict.toList (BaseDict.remove num (BaseDict.fromList pairs)))
-                , fuzz2 fuzzPairs Fuzz.int "Insert maintains invariant" <|
+                , fuzz2 fuzzPairs pairRange "Insert maintains invariant" <|
                     \pairs num ->
                         Dict.validateInvariants (Dict.insert num num (Dict.fromList pairs))
                             |> Expect.equal ""
-                , fuzz2 fuzzPairs Fuzz.int "Remove maintains invariant" <|
+                , fuzz2 fuzzPairs pairRange "Remove maintains invariant" <|
                     \pairs num ->
                         Dict.validateInvariants (Dict.remove num (Dict.fromList pairs))
                             |> Expect.equal ""

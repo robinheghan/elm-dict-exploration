@@ -81,6 +81,7 @@ that lets you look up a `String` (such as user names) and find the associated
 -}
 type Dict k v
     = Leaf
+      -- isRed key value left right
     | Node Bool k v (Dict k v) (Dict k v)
 
 
@@ -177,24 +178,164 @@ insertHelp key value dict =
         Leaf ->
             Node True key value Leaf Leaf
 
-        Node isRed nodeKey nodeValue left right ->
-            case compare key nodeKey of
-                EQ ->
-                    Node isRed key value left right
-
+        Node nColor nKey nValue nLeft nRight ->
+            case compare key nKey of
                 LT ->
-                    balanceLeft isRed nodeKey nodeValue (insertHelp key value left) right
+                    Node nColor nKey nValue (insertHelp key value nLeft) nRight
+                        |> balance
 
                 GT ->
-                    balanceRight isRed nodeKey nodeValue left (insertHelp key value right)
+                    Node nColor nKey nValue nLeft (insertHelp key value nRight)
+                        |> balance
+
+                EQ ->
+                    Node nColor nKey value nLeft nRight
+
+
+
+{- Node helpers -}
+
+
+isRed : Dict k v -> Bool
+isRed dict =
+    case dict of
+        Node True _ _ _ _ ->
+            True
+
+        _ ->
+            False
+
+
+turnRed : Dict k v -> Dict k v
+turnRed dict =
+    case dict of
+        Leaf ->
+            Leaf
+
+        Node _ key value left right ->
+            Node True key value left right
+
+
+turnBlack : Dict k v -> Dict k v
+turnBlack dict =
+    case dict of
+        Leaf ->
+            Leaf
+
+        Node _ key value left right ->
+            Node False key value left right
+
+
+balance : Dict k v -> Dict k v
+balance dict =
+    dict
+        |> balanceRotateLeft
+        |> balanceRotateRight
+        |> balanceFlipColors
+
+
+balanceRotateLeft : Dict k v -> Dict k v
+balanceRotateLeft dict =
+    case dict of
+        Leaf ->
+            Leaf
+
+        Node _ _ _ left right ->
+            if isRed right then
+                rotateLeft dict
+            else
+                dict
+
+
+rotateLeft : Dict k v -> Dict k v
+rotateLeft dict =
+    case dict of
+        Node color key value left ((Node rColor rKey rValue rLeft rRight) as right) ->
+            Node
+                color
+                rKey
+                rValue
+                (Node True key value left rLeft)
+                rRight
+
+        _ ->
+            dict
+
+
+balanceRotateRight : Dict k v -> Dict k v
+balanceRotateRight dict =
+    case dict of
+        Node _ _ _ ((Node _ _ _ lLeft _) as left) _ ->
+            if isRed left && isRed lLeft then
+                rotateRight dict
+            else
+                dict
+
+        _ ->
+            dict
+
+
+rotateRight : Dict k v -> Dict k v
+rotateRight dict =
+    case dict of
+        Node color key value ((Node lColor lKey lValue lLeft lRight) as left) right ->
+            Node
+                color
+                lKey
+                lValue
+                lLeft
+                (Node True key value lRight right)
+
+        _ ->
+            dict
+
+
+balanceFlipColors : Dict k v -> Dict k v
+balanceFlipColors dict =
+    case dict of
+        Leaf ->
+            Leaf
+
+        Node _ _ _ left right ->
+            if isRed left && isRed right then
+                flipColors dict
+            else
+                dict
+
+
+flipColors : Dict k v -> Dict k v
+flipColors dict =
+    case dict of
+        Node color key value (Node lColor lKey lValue lLeft lRight) (Node rColor rKey rValue rLeft rRight) ->
+            Node
+                (not color)
+                key
+                value
+                (Node (not lColor) lKey lValue lLeft lRight)
+                (Node (not rColor) rKey rValue rLeft rRight)
+
+        _ ->
+            dict
+
+
+
+{- Remove -}
 
 
 {-| Remove a key-value pair from a dictionary. If the key is not found,
 no changes are made.
 -}
 remove : comparable -> Dict comparable v -> Dict comparable v
-remove key dict =
-    turnBlack (removeHelp key (turnRed dict))
+remove targetKey dict =
+    case dict of
+        Leaf ->
+            Leaf
+
+        Node _ _ _ left right ->
+            if not (isRed left) && not (isRed right) then
+                turnBlack (removeHelp targetKey (turnRed dict))
+            else
+                turnBlack (removeHelp targetKey dict)
 
 
 removeHelp : comparable -> Dict comparable v -> Dict comparable v
@@ -203,140 +344,164 @@ removeHelp targetKey dict =
         Leaf ->
             Leaf
 
-        Node isRed key value left right ->
-            case compare targetKey key of
-                EQ ->
-                    removeHelpEQ targetKey isRed key value left right
+        Node color key value left right ->
+            balance <|
+                if targetKey < key then
+                    case left of
+                        Leaf ->
+                            case moveRedLeft dict of
+                                Node color key value left right ->
+                                    Node color key value (removeHelp targetKey left) right
 
-                LT ->
-                    removeHelpLT targetKey isRed key value left right
+                                Leaf ->
+                                    Leaf
 
-                GT ->
-                    removeHelpGT targetKey isRed key value left right
+                        Node False _ _ (Node False _ _ _ _) _ ->
+                            case moveRedLeft dict of
+                                Node color key value left right ->
+                                    Node color key value (removeHelp targetKey left) right
 
+                                Leaf ->
+                                    Leaf
 
-removeHelpLT : comparable -> Bool -> comparable -> v -> Dict comparable v -> Dict comparable v -> Dict comparable v
-removeHelpLT targetKey isRed key value left right =
-    if isRed then
-        case left of
-            Node False _ _ (Node False _ _ _ _) _ ->
-                case right of
-                    Node False rKey rValue (Node True rlKey rlValue rlLeft rlRight) rRight ->
-                        Node
-                            True
-                            rlKey
-                            rlValue
-                            (Node False key value (removeHelp targetKey (turnRed left)) rlLeft)
-                            (Node False rKey rValue rlRight rRight)
+                        Node False _ _ Leaf _ ->
+                            case moveRedLeft dict of
+                                Node color key value left right ->
+                                    Node color key value (removeHelp targetKey left) right
 
-                    _ ->
-                        balanceRight
-                            False
-                            key
-                            value
-                            (removeHelp targetKey (turnRed left))
-                            (turnRed right)
+                                Leaf ->
+                                    Leaf
 
-            _ ->
-                Node isRed key value (removeHelp targetKey left) right
-    else
-        Node isRed key value (removeHelp targetKey left) right
+                        _ ->
+                            Node color key value (removeHelp targetKey left) right
+                else
+                    dict
+                        |> removeHelpRotateRight
+                        |> removeHelpShouldTerminate targetKey
+                        |> removeHelpMoveRedRight
+                        |> removeHelpBottomRemove targetKey
 
 
-removeHelpGT : comparable -> Bool -> comparable -> v -> Dict comparable v -> Dict comparable v -> Dict comparable v
-removeHelpGT targetKey isRed key value left right =
-    case left of
-        Node True lKey lValue lLeft lRight ->
-            balanceRight
-                True
-                lKey
-                lValue
-                lLeft
-                (removeHelp targetKey (Node True key value lRight right))
+removeHelpRotateRight : Dict k v -> Dict k v
+removeHelpRotateRight dict =
+    case dict of
+        Node _ _ _ (Node True _ _ _ _) _ ->
+            rotateRight dict
 
         _ ->
-            if isRed then
-                case right of
-                    Node False _ _ (Node False _ _ _ _) _ ->
-                        case left of
-                            Node False lKey lValue ((Node True _ _ _ _) as lLeft) lRight ->
-                                Node
-                                    True
-                                    lKey
-                                    lValue
-                                    (turnBlack lLeft)
-                                    (balanceRight False key value lRight (removeHelp targetKey (turnRed right)))
+            dict
 
-                            _ ->
-                                balanceRight
-                                    False
-                                    key
-                                    value
-                                    (turnRed left)
-                                    (removeHelp targetKey (turnRed right))
 
-                    _ ->
-                        Node True key value left (removeHelp targetKey right)
+removeHelpShouldTerminate : comparable -> Dict comparable v -> Dict comparable v
+removeHelpShouldTerminate targetKey dict =
+    case dict of
+        Node isRed key value left Leaf ->
+            if targetKey == key then
+                Leaf
             else
-                Node True key value left (removeHelp targetKey right)
+                dict
+
+        _ ->
+            dict
 
 
-removeHelpEQ : comparable -> Bool -> comparable -> v -> Dict comparable v -> Dict comparable v -> Dict comparable v
-removeHelpEQ targetKey isRed key value left right =
-    case ( isRed, left, right ) of
-        ( True, Leaf, Leaf ) ->
-            Leaf
+removeHelpMoveRedRight : Dict k v -> Dict k v
+removeHelpMoveRedRight dict =
+    case dict of
+        Node _ _ _ _ (Node False _ _ (Node False _ _ _ _) _) ->
+            moveRedRight dict
 
-        ( _, Node True lKey lValue lLeft lRight, _ ) ->
-            balanceRight
-                isRed
-                lKey
-                lValue
-                lLeft
-                (removeHelp targetKey (Node True key value lRight right))
+        Node _ _ _ _ (Node False _ _ Leaf _) ->
+            moveRedRight dict
 
-        ( True, Node False lKey lValue ((Node True _ _ _ _) as lLeft) lRight, Node False _ _ (Node False _ _ _ _) _ ) ->
-            balanceRight
-                True
-                lKey
-                lValue
-                (turnBlack lLeft)
-                (case getMin right of
-                    Node _ mKey mValue _ _ ->
-                        balanceRight False mKey mValue lRight (deleteMin (turnRed right))
+        _ ->
+            dict
+
+
+removeHelpBottomRemove : comparable -> Dict comparable v -> Dict comparable v
+removeHelpBottomRemove targetKey dict =
+    case dict of
+        Node isRed key value left right ->
+            if targetKey == key then
+                case getMin right of
+                    Node _ minKey minValue _ _ ->
+                        Node isRed minKey minValue left (deleteMin right)
 
                     Leaf ->
                         Leaf
-                )
+            else
+                Node isRed key value left (removeHelp targetKey right)
 
-        ( True, _, Node False _ _ (Node False _ _ _ _) _ ) ->
-            case getMin right of
-                Node _ mKey mValue _ _ ->
-                    balanceRight
-                        False
-                        mKey
-                        mValue
-                        (turnRed left)
-                        (deleteMin (turnRed right))
+        Leaf ->
+            Leaf
 
+
+getMin : Dict k v -> Dict k v
+getMin dict =
+    case dict of
+        Leaf ->
+            Leaf
+
+        Node _ _ _ left _ ->
+            case left of
                 Leaf ->
-                    Leaf
+                    dict
 
-        ( True, _, Node False _ _ _ _ ) ->
-            case getMin right of
-                Node _ mKey mValue _ _ ->
-                    Node
-                        True
-                        mKey
-                        mValue
-                        left
-                        (deleteMin right)
+                Node _ _ _ _ _ ->
+                    getMin left
 
-                Leaf ->
-                    Leaf
+
+deleteMin : Dict k v -> Dict k v
+deleteMin dict =
+    case dict of
+        Node _ _ _ ((Node _ _ _ lLeft _) as left) _ ->
+            let
+                node =
+                    if not (isRed left) && not (isRed lLeft) then
+                        moveRedLeft dict
+                    else
+                        dict
+            in
+                case node of
+                    Leaf ->
+                        Leaf
+
+                    Node color key val left right ->
+                        Node color key val (deleteMin left) right
+                            |> balance
 
         _ ->
             Leaf
+
+
+moveRedLeft : Dict k v -> Dict k v
+moveRedLeft dict =
+    case flipColors dict of
+        Node color key value left ((Node _ _ _ rLeft _) as right) ->
+            if isRed rLeft then
+                Node color key value left (rotateRight right)
+                    |> rotateLeft
+                    |> flipColors
+            else
+                Node color key value left right
+
+        x ->
+            x
+
+
+moveRedRight : Dict k v -> Dict k v
+moveRedRight dict =
+    case flipColors dict of
+        Node color key value ((Node _ _ _ lLeft _) as left) right ->
+            if isRed lLeft then
+                Node color key value left right
+                    |> rotateRight
+                    |> flipColors
+            else
+                Node color key value left right
+
+        x ->
+            x
 
 
 {-| Update the value of a dictionary for a specific key with a given function.
@@ -349,265 +514,6 @@ update key alter dict =
 
         Just value ->
             insert key value dict
-
-
-
--- HELPERS
-
-
-validateInvariants : Dict k v -> String
-validateInvariants dict =
-    case dict of
-        Leaf ->
-            ""
-
-        Node False _ _ left right ->
-            let
-                error =
-                    validateInvariantsHelp dict
-
-                blackHeightLeft =
-                    blackHeight left
-
-                blackHeightRight =
-                    blackHeight right
-            in
-                if error /= "" then
-                    error
-                else if blackHeightLeft /= blackHeightRight then
-                    "Black left(" ++ toString blackHeightLeft ++ ") /= Black right(" ++ toString blackHeightRight ++ ")"
-                else
-                    ""
-
-        _ ->
-            "Root node should be black!"
-
-
-validateInvariantsHelp : Dict k v -> String
-validateInvariantsHelp dict =
-    let
-        testChildren : Dict k v -> Dict k v -> String
-        testChildren left right =
-            let
-                leftError =
-                    validateInvariantsHelp left
-            in
-                if leftError == "" then
-                    validateInvariantsHelp right
-                else
-                    leftError
-    in
-        case dict of
-            -- Red nodes always have two black children
-            Node True _ _ left right ->
-                if isBlack left && isBlack right then
-                    testChildren left right
-                else
-                    "Red nodes should have two black children!"
-
-            -- Right children should not exist
-            Node _ _ _ _ (Node True _ _ _ _) ->
-                "Right should not exist!"
-
-            -- Left and Right node has to maintain invariants as well
-            Node _ _ _ left right ->
-                testChildren left right
-
-            -- If we've reached a leaf we're done
-            Leaf ->
-                ""
-
-
-blackHeight : Dict k v -> Int
-blackHeight dict =
-    let
-        helper : Int -> Dict k v -> Int
-        helper acc node =
-            case node of
-                Leaf ->
-                    acc + 1
-
-                Node isRed _ _ left right ->
-                    let
-                        newAcc =
-                            if isRed then
-                                acc
-                            else
-                                acc + 1
-                    in
-                        max (helper newAcc left) (helper newAcc right)
-    in
-        helper 0 dict
-
-
-isBlack : Dict k v -> Bool
-isBlack dict =
-    case dict of
-        Leaf ->
-            True
-
-        Node isRed _ _ _ _ ->
-            not isRed
-
-
-balanceLeft : Bool -> k -> v -> Dict k v -> Dict k v -> Dict k v
-balanceLeft isRed key value left right =
-    case ( isRed, left ) of
-        ( False, Node True lKey lValue ((Node True _ _ _ _) as lLeft) lRight ) ->
-            Node
-                True
-                lKey
-                lValue
-                (turnBlack lLeft)
-                (Node False key value lRight right)
-
-        _ ->
-            Node isRed key value left right
-
-
-balanceRight : Bool -> k -> v -> Dict k v -> Dict k v -> Dict k v
-balanceRight isRed key value left right =
-    case right of
-        Node True rKey rValue rLeft rRight ->
-            case left of
-                Node True _ _ _ _ ->
-                    Node True key value (turnBlack left) (turnBlack right)
-
-                _ ->
-                    Node isRed rKey rValue (Node True key value left rLeft) rRight
-
-        _ ->
-            Node isRed key value left right
-
-
-turnBlack : Dict k v -> Dict k v
-turnBlack dict =
-    case dict of
-        Node _ key value left right ->
-            Node False key value left right
-
-        Leaf ->
-            Leaf
-
-
-turnRed : Dict k v -> Dict k v
-turnRed dict =
-    case dict of
-        Node _ key value left right ->
-            Node True key value left right
-
-        Leaf ->
-            Leaf
-
-
-moveRedLeft : Dict k v -> Dict k v
-moveRedLeft dict =
-    let
-        flipped =
-            colorFlip dict
-    in
-        case flipped of
-            Node isRed key value left ((Node _ _ _ (Node True _ _ _ _) _) as right) ->
-                Node isRed key value left (rotateRight right)
-                    |> rotateLeft
-                    |> colorFlip
-
-            _ ->
-                flipped
-
-
-moveRedRight : Dict k v -> Dict k v
-moveRedRight dict =
-    let
-        flipped =
-            colorFlip dict
-    in
-        case flipped of
-            Node isRed key value ((Node _ _ _ (Node True _ _ _ _) _) as left) right ->
-                flipped
-                    |> rotateRight
-                    |> colorFlip
-
-            _ ->
-                flipped
-
-
-rotateLeft : Dict k v -> Dict k v
-rotateLeft dict =
-    case dict of
-        Node isRed key value left (Node rRed rKey rValue rLeft rRight) ->
-            Node
-                isRed
-                rKey
-                rValue
-                (Node True key value left rLeft)
-                rRight
-
-        _ ->
-            dict
-
-
-rotateRight : Dict k v -> Dict k v
-rotateRight dict =
-    case dict of
-        Node isRed key value (Node lRed lKey lValue lLeft lRight) right ->
-            Node
-                isRed
-                lKey
-                lValue
-                lLeft
-                (Node True key value lRight right)
-
-        _ ->
-            dict
-
-
-colorFlip : Dict k v -> Dict k v
-colorFlip dict =
-    case dict of
-        Node isRed key value (Node lRed lKey lValue lLeft lRight) (Node rRed rKey rValue rLeft rRight) ->
-            Node
-                (not isRed)
-                key
-                value
-                (Node (not lRed) lKey lValue lLeft lRight)
-                (Node (not rRed) rKey rValue rLeft rRight)
-
-        _ ->
-            dict
-
-
-deleteMin : Dict k v -> Dict k v
-deleteMin dict =
-    case dict of
-        Leaf ->
-            Leaf
-
-        Node isRed key value left right ->
-            case left of
-                Leaf ->
-                    Leaf
-
-                Node False _ _ (Node False _ _ _ _) _ ->
-                    case moveRedLeft dict of
-                        Node isRed key value left right ->
-                            balanceLeft isRed key value (deleteMin left) right
-
-                        Leaf ->
-                            Leaf
-
-                _ ->
-                    balanceLeft isRed key value (deleteMin left) right
-
-
-getMin : Dict k v -> Dict k v
-getMin dict =
-    case dict of
-        Node _ _ _ ((Node _ _ _ _ _) as left) _ ->
-            getMin left
-
-        _ ->
-            dict
 
 
 
@@ -780,3 +686,92 @@ toList dict =
 fromList : List ( comparable, v ) -> Dict comparable v
 fromList assocs =
     List.foldl (\( key, value ) dict -> insert key value dict) empty assocs
+
+
+
+{- validation -}
+
+
+validateInvariants : Dict comparable v -> String
+validateInvariants dict =
+    if not (isBST dict) then
+        "Not in symmetric order"
+    else if not (is23 dict) then
+        "Not a 2-3 tree"
+    else if not (isBalanced dict) then
+        "Not balanced"
+    else
+        ""
+
+
+isBST : Dict comparable v -> Bool
+isBST dict =
+    isBSTHelper True (keys dict)
+
+
+isBSTHelper : Bool -> List comparable -> Bool
+isBSTHelper acc keys =
+    case keys of
+        [] ->
+            acc
+
+        x :: [] ->
+            acc
+
+        x :: y :: xs ->
+            isBSTHelper (acc && x < y) (y :: xs)
+
+
+is23 : Dict k v -> Bool
+is23 dict =
+    is23Helper dict dict
+
+
+is23Helper : Dict k v -> Dict k v -> Bool
+is23Helper root node =
+    case node of
+        Leaf ->
+            True
+
+        Node clr _ _ left right ->
+            if isRed right then
+                False
+            else if node /= root && clr && isRed left then
+                False
+            else
+                is23 left && is23 right
+
+
+isBalanced : Dict k v -> Bool
+isBalanced dict =
+    isBalancedHelper dict <| isBalancedBlacksHelper dict 0
+
+
+isBalancedBlacksHelper : Dict k v -> Int -> Int
+isBalancedBlacksHelper node blacks =
+    case node of
+        Leaf ->
+            blacks
+
+        Node isRed _ _ left _ ->
+            if isRed then
+                isBalancedBlacksHelper left blacks
+            else
+                isBalancedBlacksHelper left (blacks + 1)
+
+
+isBalancedHelper : Dict k v -> Int -> Bool
+isBalancedHelper node blacks =
+    case node of
+        Leaf ->
+            blacks == 0
+
+        Node isRed _ _ left right ->
+            let
+                nextBlacks =
+                    if isRed then
+                        blacks
+                    else
+                        blacks - 1
+            in
+                isBalancedHelper left nextBlacks && isBalancedHelper right nextBlacks
