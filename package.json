@@ -1,6 +1,6 @@
 {
     "scripts": {
-        "test": "elm-test --fuzz=100"
+        "test": "elm-test --fuzz=10000"
     },
     "devDependencies": {
         "elm-test": "^0.18.7"
