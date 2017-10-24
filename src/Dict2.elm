@@ -267,11 +267,13 @@ rotateLeft dict =
 balanceRotateRight : Dict k v -> Dict k v
 balanceRotateRight dict =
     case dict of
-        Node _ _ _ ((Node _ _ _ lLeft _) as left) _ ->
-            if isRed left && isRed lLeft then
-                rotateRight dict
-            else
-                dict
+        Node clr k v (Node True lK lV ((Node True _ _ _ _) as lLeft) lRight) right ->
+            Node
+                clr
+                lK
+                lV
+                lLeft
+                (Node True k v lRight right)
 
         _ ->
             dict
@@ -295,14 +297,16 @@ rotateRight dict =
 balanceFlipColors : Dict k v -> Dict k v
 balanceFlipColors dict =
     case dict of
-        Leaf ->
-            Leaf
+        Node clr k v (Node True lK lV lLeft lRight) (Node True rK rV rLeft rRight) ->
+            Node
+                (not clr)
+                k
+                v
+                (Node False lK lV lLeft lRight)
+                (Node False rK rV rLeft rRight)
 
-        Node _ _ _ left right ->
-            if isRed left && isRed right then
-                flipColors dict
-            else
-                dict
+        _ ->
+            dict
 
 
 flipColors : Dict k v -> Dict k v
