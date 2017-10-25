@@ -70,11 +70,6 @@ import List exposing (..)
 import String
 
 
--- DICTIONARIES
--- BBlack and NBlack should only be used during the deletion
--- algorithm. Any other occurrence is a bug and should fail an assert.
-
-
 {-| A dictionary of keys and values. So a `(Dict String User)` is a dictionary
 that lets you look up a `String` (such as user names) and find the associated
 `User`.
@@ -169,7 +164,12 @@ a collision.
 -}
 insert : comparable -> v -> Dict comparable v -> Dict comparable v
 insert key value dict =
-    turnBlack (insertHelp key value dict)
+    case insertHelp key value dict of
+        Leaf ->
+            Leaf
+
+        Node _ k v left right ->
+            Node False k v left right
 
 
 insertHelp : comparable -> v -> Dict comparable v -> Dict comparable v
@@ -181,12 +181,10 @@ insertHelp key value dict =
         Node nColor nKey nValue nLeft nRight ->
             case compare key nKey of
                 LT ->
-                    Node nColor nKey nValue (insertHelp key value nLeft) nRight
-                        |> balance
+                    balance nColor nKey nValue (insertHelp key value nLeft) nRight
 
                 GT ->
-                    Node nColor nKey nValue nLeft (insertHelp key value nRight)
-                        |> balance
+                    balance nColor nKey nValue nLeft (insertHelp key value nRight)
 
                 EQ ->
                     Node nColor nKey value nLeft nRight
@@ -206,47 +204,18 @@ isRed dict =
             False
 
 
-turnRed : Dict k v -> Dict k v
-turnRed dict =
-    case dict of
-        Leaf ->
-            Leaf
-
-        Node _ key value left right ->
-            Node True key value left right
-
-
-turnBlack : Dict k v -> Dict k v
-turnBlack dict =
-    case dict of
-        Leaf ->
-            Leaf
-
-        Node _ key value left right ->
-            Node False key value left right
-
-
-balance : Dict k v -> Dict k v
-balance dict =
-    dict
-        |> balanceRotateLeft
-        |> balanceRotateRight
-        |> balanceFlipColors
-
-
-balanceRotateLeft : Dict k v -> Dict k v
-balanceRotateLeft dict =
-    case dict of
-        Node clr k v left (Node True rK rV rLeft rRight) ->
-            Node
-                clr
-                rK
-                rV
-                (Node True k v left rLeft)
-                rRight
+balance : Bool -> k -> v -> Dict k v -> Dict k v -> Dict k v
+balance isRed key value left right =
+    case right of
+        Node True rK rV rLeft rRight ->
+            Node isRed rK rV (Node True key value left rLeft) rRight
+                |> balanceRotateRight
+                |> balanceFlipColors
 
         _ ->
-            dict
+            Node isRed key value left right
+                |> balanceRotateRight
+                |> balanceFlipColors
 
 
 rotateLeft : Dict k v -> Dict k v
@@ -333,15 +302,12 @@ no changes are made.
 -}
 remove : comparable -> Dict comparable v -> Dict comparable v
 remove targetKey dict =
-    case dict of
+    case removeHelp targetKey dict of
         Leaf ->
             Leaf
 
-        Node _ _ _ left right ->
-            if not (isRed left) && not (isRed right) then
-                turnBlack (removeHelp targetKey (turnRed dict))
-            else
-                turnBlack (removeHelp targetKey dict)
+        Node _ k v left right ->
+            Node False k v left right
 
 
 removeHelp : comparable -> Dict comparable v -> Dict comparable v
@@ -356,8 +322,7 @@ removeHelp targetKey dict =
                     Leaf ->
                         case moveRedLeft dict of
                             Node color key value left right ->
-                                Node color key value (removeHelp targetKey left) right
-                                    |> balance
+                                balance color key value (removeHelp targetKey left) right
 
                             Leaf ->
                                 Leaf
@@ -370,8 +335,7 @@ removeHelp targetKey dict =
                             _ ->
                                 case moveRedLeft dict of
                                     Node color key value left right ->
-                                        Node color key value (removeHelp targetKey left) right
-                                            |> balance
+                                        balance color key value (removeHelp targetKey left) right
 
                                     Leaf ->
                                         Leaf
@@ -384,7 +348,6 @@ removeHelp targetKey dict =
                     |> removeHelpShouldTerminate targetKey
                     |> removeHelpMoveRedRight
                     |> removeHelpBottomRemove targetKey
-                    |> balance
 
 
 removeHelpRotateRight : Dict k v -> Dict k v
@@ -430,12 +393,12 @@ removeHelpBottomRemove targetKey dict =
             if targetKey == key then
                 case getMin right of
                     Node _ minKey minValue _ _ ->
-                        Node isRed minKey minValue left (deleteMin right)
+                        balance isRed minKey minValue left (deleteMin right)
 
                     Leaf ->
                         Leaf
             else
-                Node isRed key value left (removeHelp targetKey right)
+                balance isRed key value left (removeHelp targetKey right)
 
         Leaf ->
             Leaf
@@ -472,8 +435,7 @@ deleteMin dict =
                         Leaf
 
                     Node color key val left right ->
-                        Node color key val (deleteMin left) right
-                            |> balance
+                        balance color key val (deleteMin left) right
 
         _ ->
             Leaf
@@ -507,11 +469,30 @@ moveRedLeft dict =
 
 moveRedRight : Dict k v -> Dict k v
 moveRedRight dict =
-    case flipColors dict of
-        Node color key value ((Node _ _ _ (Node True _ _ _ _) _) as left) right ->
-            Node color key value left right
-                |> rotateRight
-                |> flipColors
+    case dict of
+        Node clr k v (Node lClr lK lV (Node True llK llV llLeft llRight) lRight) (Node rClr rK rV rLeft rRight) ->
+            Node
+                clr
+                lK
+                lV
+                (Node False llK llV llLeft llRight)
+                (Node False k v lRight (Node (not rClr) rK rV rLeft rRight))
+
+        Node clr k v (Node lClr lK lV (Node True llK llV llLeft llRight) lRight) right ->
+            Node
+                (not clr)
+                lK
+                lV
+                (Node False llK llV llLeft llRight)
+                (Node False k v lRight right)
+
+        Node clr k v (Node lClr lK lV lLeft lRight) (Node rClr rK rV rLeft rRight) ->
+            Node
+                (not clr)
+                k
+                v
+                (Node (not lClr) lK lV lLeft lRight)
+                (Node (not rClr) rK rV rLeft rRight)
 
         x ->
             x
