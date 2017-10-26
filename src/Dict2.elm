@@ -359,12 +359,6 @@ removeHelpRotateRight targetKey isRed key value left right =
 
         _ ->
             case right of
-                Leaf ->
-                    if targetKey == key then
-                        Leaf
-                    else
-                        Node isRed key value left right
-
                 Node False _ _ (Node False _ _ _ _) _ ->
                     moveRedRight isRed key value left right
 
@@ -396,35 +390,33 @@ removeHelpBottomRemove targetKey dict =
 getMin : Dict k v -> Dict k v
 getMin dict =
     case dict of
-        Leaf ->
-            Leaf
+        Node _ _ _ ((Node _ _ _ _ _) as left) _ ->
+            getMin left
 
-        Node _ _ _ left _ ->
-            case left of
-                Leaf ->
-                    dict
-
-                Node _ _ _ _ _ ->
-                    getMin left
+        _ ->
+            dict
 
 
 deleteMin : Dict k v -> Dict k v
 deleteMin dict =
     case dict of
-        Node _ _ _ ((Node _ _ _ lLeft _) as left) _ ->
-            let
-                node =
-                    if not (isRed left) && not (isRed lLeft) then
-                        moveRedLeft dict
-                    else
-                        dict
-            in
-                case node of
-                    Leaf ->
-                        Leaf
+        Node color key value ((Node _ _ _ _ _) as left) right ->
+            case left of
+                Node False _ _ lLeft _ ->
+                    case lLeft of
+                        Node True _ _ _ _ ->
+                            balance color key value (deleteMin left) right
 
-                    Node color key val left right ->
-                        balance color key val (deleteMin left) right
+                        _ ->
+                            case moveRedLeft dict of
+                                Node color key value left right ->
+                                    balance color key value (deleteMin left) right
+
+                                Leaf ->
+                                    Leaf
+
+                _ ->
+                    balance color key value (deleteMin left) right
 
         _ ->
             Leaf
