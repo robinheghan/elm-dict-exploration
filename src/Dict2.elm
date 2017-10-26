@@ -342,47 +342,37 @@ removeHelp targetKey dict =
                     _ ->
                         Node color key value (removeHelp targetKey left) right
             else
-                dict
-                    |> removeHelpRotateRight
-                    |> removeHelpShouldTerminate targetKey
-                    |> removeHelpMoveRedRight
+                removeHelpRotateRight targetKey color key value left right
                     |> removeHelpBottomRemove targetKey
 
 
-removeHelpRotateRight : Dict k v -> Dict k v
-removeHelpRotateRight dict =
-    case dict of
-        Node _ _ _ (Node True _ _ _ _) _ ->
-            rotateRight dict
+removeHelpRotateRight : comparable -> Bool -> comparable -> v -> Dict comparable v -> Dict comparable v -> Dict comparable v
+removeHelpRotateRight targetKey isRed key value left right =
+    case left of
+        Node True lK lV lLeft lRight ->
+            Node
+                isRed
+                lK
+                lV
+                lLeft
+                (Node True key value lRight right)
 
         _ ->
-            dict
+            case right of
+                Leaf ->
+                    if targetKey == key then
+                        Leaf
+                    else
+                        Node isRed key value left right
 
+                Node False _ _ (Node False _ _ _ _) _ ->
+                    moveRedRight isRed key value left right
 
-removeHelpShouldTerminate : comparable -> Dict comparable v -> Dict comparable v
-removeHelpShouldTerminate targetKey dict =
-    case dict of
-        Node isRed key value left Leaf ->
-            if targetKey == key then
-                Leaf
-            else
-                dict
+                Node False _ _ Leaf _ ->
+                    moveRedRight isRed key value left right
 
-        _ ->
-            dict
-
-
-removeHelpMoveRedRight : Dict k v -> Dict k v
-removeHelpMoveRedRight dict =
-    case dict of
-        Node _ _ _ _ (Node False _ _ (Node False _ _ _ _) _) ->
-            moveRedRight dict
-
-        Node _ _ _ _ (Node False _ _ Leaf _) ->
-            moveRedRight dict
-
-        _ ->
-            dict
+                _ ->
+                    Node isRed key value left right
 
 
 removeHelpBottomRemove : comparable -> Dict comparable v -> Dict comparable v
@@ -466,35 +456,35 @@ moveRedLeft dict =
             dict
 
 
-moveRedRight : Dict k v -> Dict k v
-moveRedRight dict =
-    case dict of
-        Node clr k v (Node lClr lK lV (Node True llK llV llLeft llRight) lRight) (Node rClr rK rV rLeft rRight) ->
+moveRedRight : Bool -> k -> v -> Dict k v -> Dict k v -> Dict k v
+moveRedRight isRed key value left right =
+    case ( left, right ) of
+        ( Node lClr lK lV (Node True llK llV llLeft llRight) lRight, Node rClr rK rV rLeft rRight ) ->
             Node
-                clr
+                isRed
                 lK
                 lV
                 (Node False llK llV llLeft llRight)
-                (Node False k v lRight (Node (not rClr) rK rV rLeft rRight))
+                (Node False key value lRight (Node (not rClr) rK rV rLeft rRight))
 
-        Node clr k v (Node lClr lK lV (Node True llK llV llLeft llRight) lRight) right ->
+        ( Node lClr lK lV (Node True llK llV llLeft llRight) lRight, right ) ->
             Node
-                (not clr)
+                (not isRed)
                 lK
                 lV
                 (Node False llK llV llLeft llRight)
-                (Node False k v lRight right)
+                (Node False key value lRight right)
 
-        Node clr k v (Node lClr lK lV lLeft lRight) (Node rClr rK rV rLeft rRight) ->
+        ( Node lClr lK lV lLeft lRight, Node rClr rK rV rLeft rRight ) ->
             Node
-                (not clr)
-                k
-                v
+                (not isRed)
+                key
+                value
                 (Node (not lClr) lK lV lLeft lRight)
                 (Node (not rClr) rK rV rLeft rRight)
 
-        x ->
-            x
+        _ ->
+            Node isRed key value left right
 
 
 {-| Update the value of a dictionary for a specific key with a given function.
