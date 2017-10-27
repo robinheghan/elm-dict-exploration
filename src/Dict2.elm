@@ -190,10 +190,6 @@ insertHelp key value dict =
                     Node nColor nKey value nLeft nRight
 
 
-
-{- Node helpers -}
-
-
 balance : Bool -> k -> v -> Dict k v -> Dict k v -> Dict k v
 balance isRed key value left right =
     case left of
@@ -237,21 +233,6 @@ balanceRight isRed key value left right =
             Node isRed key value left right
 
 
-rotateLeft : Dict k v -> Dict k v
-rotateLeft dict =
-    case dict of
-        Node color key value left ((Node rColor rKey rValue rLeft rRight) as right) ->
-            Node
-                color
-                rKey
-                rValue
-                (Node True key value left rLeft)
-                rRight
-
-        _ ->
-            dict
-
-
 rotateRight : Dict k v -> Dict k v
 rotateRight dict =
     case dict of
@@ -265,25 +246,6 @@ rotateRight dict =
 
         _ ->
             dict
-
-
-flipColors : Dict k v -> Dict k v
-flipColors dict =
-    case dict of
-        Node color key value (Node lColor lKey lValue lLeft lRight) (Node rColor rKey rValue rLeft rRight) ->
-            Node
-                (not color)
-                key
-                value
-                (Node (not lColor) lKey lValue lLeft lRight)
-                (Node (not rColor) rKey rValue rLeft rRight)
-
-        _ ->
-            dict
-
-
-
-{- Remove -}
 
 
 {-| Remove a key-value pair from a dictionary. If the key is not found,
@@ -416,15 +378,17 @@ moveRedLeft : Dict k v -> Dict k v
 moveRedLeft dict =
     case dict of
         Node clr k v (Node lClr lK lV lLeft lRight) (Node rClr rK rV ((Node True _ _ _ _) as rLeft) rRight) ->
-            (Node
-                (not clr)
-                k
-                v
-                (Node (not lClr) lK lV lLeft lRight)
-                (rotateRight (Node (not rClr) rK rV rLeft rRight))
-            )
-                |> rotateLeft
-                |> flipColors
+            case rotateRight (Node (not rClr) rK rV rLeft rRight) of
+                Node rClr rK rV rLeft (Node rrClr rrK rrV rrLeft rrRight) ->
+                    Node
+                        clr
+                        rK
+                        rV
+                        (Node False k v (Node (not lClr) lK lV lLeft lRight) rLeft)
+                        (Node False rrK rrV rrLeft rrRight)
+
+                right ->
+                    Node (not clr) k v (Node (not lClr) lK lV lLeft lRight) right
 
         Node clr k v (Node lClr lK lV lLeft lRight) (Node rClr rK rV rLeft rRight) ->
             Node
