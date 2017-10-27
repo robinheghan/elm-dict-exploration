@@ -194,16 +194,6 @@ insertHelp key value dict =
 {- Node helpers -}
 
 
-isRed : Dict k v -> Bool
-isRed dict =
-    case dict of
-        Node True _ _ _ _ ->
-            True
-
-        _ ->
-            False
-
-
 balance : Bool -> k -> v -> Dict k v -> Dict k v -> Dict k v
 balance isRed key value left right =
     case left of
@@ -376,7 +366,7 @@ removeHelpBottomRemove targetKey dict =
             if targetKey == key then
                 case getMin right of
                     Node _ minKey minValue _ _ ->
-                        balanceRight isRed minKey minValue left (deleteMin right)
+                        balanceRight isRed minKey minValue left (removeMin right)
 
                     Leaf ->
                         Leaf
@@ -397,26 +387,26 @@ getMin dict =
             dict
 
 
-deleteMin : Dict k v -> Dict k v
-deleteMin dict =
+removeMin : Dict k v -> Dict k v
+removeMin dict =
     case dict of
         Node color key value ((Node _ _ _ _ _) as left) right ->
             case left of
                 Node False _ _ lLeft _ ->
                     case lLeft of
                         Node True _ _ _ _ ->
-                            balance color key value (deleteMin left) right
+                            balance color key value (removeMin left) right
 
                         _ ->
                             case moveRedLeft dict of
                                 Node color key value left right ->
-                                    balance color key value (deleteMin left) right
+                                    balance color key value (removeMin left) right
 
                                 Leaf ->
                                     Leaf
 
                 _ ->
-                    balance color key value (deleteMin left) right
+                    balance color key value (removeMin left) right
 
         _ ->
             Leaf
@@ -715,6 +705,16 @@ is23Helper root node =
                 False
             else
                 is23 left && is23 right
+
+
+isRed : Dict k v -> Bool
+isRed dict =
+    case dict of
+        Node True _ _ _ _ ->
+            True
+
+        _ ->
+            False
 
 
 isBalanced : Dict k v -> Bool
