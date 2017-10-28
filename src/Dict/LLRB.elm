@@ -294,12 +294,12 @@ removeHelp targetKey dict =
                     _ ->
                         Node color key value (removeHelp targetKey left) right
             else
-                removeHelpRotateRight targetKey color key value left right
-                    |> removeHelpBottomRemove targetKey
+                removeHelpPrepEQGT targetKey color key value left right
+                    |> removeHelpEQGT targetKey
 
 
-removeHelpRotateRight : comparable -> Bool -> comparable -> v -> Dict comparable v -> Dict comparable v -> Dict comparable v
-removeHelpRotateRight targetKey isRed key value left right =
+removeHelpPrepEQGT : comparable -> Bool -> comparable -> v -> Dict comparable v -> Dict comparable v -> Dict comparable v
+removeHelpPrepEQGT targetKey isRed key value left right =
     case left of
         Node True lK lV lLeft lRight ->
             Node
@@ -321,8 +321,8 @@ removeHelpRotateRight targetKey isRed key value left right =
                     Node isRed key value left right
 
 
-removeHelpBottomRemove : comparable -> Dict comparable v -> Dict comparable v
-removeHelpBottomRemove targetKey dict =
+removeHelpEQGT : comparable -> Dict comparable v -> Dict comparable v
+removeHelpEQGT targetKey dict =
     case dict of
         Node isRed key value left right ->
             if targetKey == key then
