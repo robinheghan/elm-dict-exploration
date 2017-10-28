@@ -668,7 +668,7 @@ is23Helper root node =
             else if node /= root && clr && isRed left then
                 False
             else
-                is23 left && is23 right
+                is23Helper root left && is23Helper root right
 
 
 isRed : Dict k v -> Bool
