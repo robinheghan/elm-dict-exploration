@@ -1,4 +1,4 @@
-module Dict2
+module Dict.LLRB
     exposing
         ( Dict
         , empty
@@ -328,12 +328,12 @@ removeHelpBottomRemove targetKey dict =
             if targetKey == key then
                 case getMin right of
                     Node _ minKey minValue _ _ ->
-                        balanceRight isRed minKey minValue left (removeMin right)
+                        balance isRed minKey minValue left (removeMin right)
 
                     Leaf ->
                         Leaf
             else
-                balanceRight isRed key value left (removeHelp targetKey right)
+                balance isRed key value left (removeHelp targetKey right)
 
         Leaf ->
             Leaf

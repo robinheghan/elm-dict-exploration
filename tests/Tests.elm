@@ -2,7 +2,7 @@ module Tests exposing (tests)
 
 import Basics exposing (..)
 import Dict as BaseDict
-import Dict2 as Dict exposing (Dict)
+import Dict.LLRB as Dict exposing (Dict)
 import List
 import Maybe exposing (..)
 import Test exposing (..)
