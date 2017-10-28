@@ -3,7 +3,7 @@ module Main exposing (main)
 import Benchmark.Runner exposing (BenchmarkProgram, program)
 import Benchmark exposing (Benchmark, describe, benchmark1, benchmark2, benchmark3, benchmark4)
 import Dict
-import Dict2
+import Dict.LLRB as Dict2
 
 
 main : BenchmarkProgram

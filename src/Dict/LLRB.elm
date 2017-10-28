@@ -1,4 +1,4 @@
-module Dict2
+module Dict.LLRB
     exposing
         ( Dict
         , empty
