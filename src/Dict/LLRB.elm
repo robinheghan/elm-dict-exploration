@@ -23,7 +23,7 @@ module Dict.LLRB
         , values
         , toList
         , fromList
-        , validateInvariants
+          --, validateInvariants
         )
 
 {-| A dictionary mapping unique keys to values. The keys can be any comparable
