@@ -198,89 +198,30 @@ balance : Bool -> k -> v -> Dict k v -> Dict k v -> Dict k v
 balance isRed key value left right =
     case right of
         Node True rK rV rLeft rRight ->
-            Node isRed rK rV (Node True key value left rLeft) rRight
-                |> balanceRotateRight
-                |> balanceFlipColors
+            case left of
+                Node True lK lV lLeft lRight ->
+                    Node
+                        True
+                        key
+                        value
+                        (Node False lK lV lLeft lRight)
+                        (Node False rK rV rLeft rRight)
+
+                _ ->
+                    Node isRed rK rV (Node True key value left rLeft) rRight
 
         _ ->
-            Node isRed key value left right
-                |> balanceRotateRight
-                |> balanceFlipColors
+            case left of
+                Node True lK lV (Node True llK llV llLeft llRight) lRight ->
+                    Node
+                        True
+                        lK
+                        lV
+                        (Node False llK llV llLeft llRight)
+                        (Node False key value lRight right)
 
-
-rotateLeft : Dict k v -> Dict k v
-rotateLeft dict =
-    case dict of
-        Node color key value left ((Node rColor rKey rValue rLeft rRight) as right) ->
-            Node
-                color
-                rKey
-                rValue
-                (Node True key value left rLeft)
-                rRight
-
-        _ ->
-            dict
-
-
-balanceRotateRight : Dict k v -> Dict k v
-balanceRotateRight dict =
-    case dict of
-        Node clr k v (Node True lK lV ((Node True _ _ _ _) as lLeft) lRight) right ->
-            Node
-                clr
-                lK
-                lV
-                lLeft
-                (Node True k v lRight right)
-
-        _ ->
-            dict
-
-
-rotateRight : Dict k v -> Dict k v
-rotateRight dict =
-    case dict of
-        Node color key value ((Node lColor lKey lValue lLeft lRight) as left) right ->
-            Node
-                color
-                lKey
-                lValue
-                lLeft
-                (Node True key value lRight right)
-
-        _ ->
-            dict
-
-
-balanceFlipColors : Dict k v -> Dict k v
-balanceFlipColors dict =
-    case dict of
-        Node clr k v (Node True lK lV lLeft lRight) (Node True rK rV rLeft rRight) ->
-            Node
-                (not clr)
-                k
-                v
-                (Node False lK lV lLeft lRight)
-                (Node False rK rV rLeft rRight)
-
-        _ ->
-            dict
-
-
-flipColors : Dict k v -> Dict k v
-flipColors dict =
-    case dict of
-        Node color key value (Node lColor lKey lValue lLeft lRight) (Node rColor rKey rValue rLeft rRight) ->
-            Node
-                (not color)
-                key
-                value
-                (Node (not lColor) lKey lValue lLeft lRight)
-                (Node (not rColor) rKey rValue rLeft rRight)
-
-        _ ->
-            dict
+                _ ->
+                    Node isRed key value left right
 
 
 
@@ -408,16 +349,13 @@ removeMin dict =
 moveRedLeft : Dict k v -> Dict k v
 moveRedLeft dict =
     case dict of
-        Node clr k v (Node lClr lK lV lLeft lRight) (Node rClr rK rV ((Node True _ _ _ _) as rLeft) rRight) ->
-            (Node
-                (not clr)
-                k
-                v
-                (Node (not lClr) lK lV lLeft lRight)
-                (rotateRight (Node (not rClr) rK rV rLeft rRight))
-            )
-                |> rotateLeft
-                |> flipColors
+        Node clr k v (Node lClr lK lV lLeft lRight) (Node rClr rK rV ((Node True rlK rlV rlL rlR) as rLeft) rRight) ->
+            Node
+                True
+                rlK
+                rlV
+                (Node False k v (Node True lK lV lLeft lRight) rlL)
+                (Node False rK rV rlR rRight)
 
         Node clr k v (Node lClr lK lV lLeft lRight) (Node rClr rK rV rLeft rRight) ->
             Node
