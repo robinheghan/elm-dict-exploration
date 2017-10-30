@@ -190,10 +190,6 @@ insertHelp key value dict =
                     Node nColor nKey value nLeft nRight
 
 
-
-{- Node helpers -}
-
-
 balance : Bool -> k -> v -> Dict k v -> Dict k v -> Dict k v
 balance isRed key value left right =
     case right of
@@ -222,10 +218,6 @@ balance isRed key value left right =
 
                 _ ->
                     Node isRed key value left right
-
-
-
-{- Remove -}
 
 
 {-| Remove a key-value pair from a dictionary. If the key is not found,
@@ -266,8 +258,7 @@ removeHelp targetKey dict =
                     _ ->
                         Node isRed key value (removeHelp targetKey left) right
             else
-                removeHelpPrepEQGT targetKey dict isRed key value left right
-                    |> removeHelpEQGT targetKey
+                removeHelpEQGT targetKey (removeHelpPrepEQGT targetKey dict isRed key value left right)
 
 
 removeHelpPrepEQGT : comparable -> Dict comparable v -> Bool -> comparable -> v -> Dict comparable v -> Dict comparable v -> Dict comparable v
@@ -324,23 +315,21 @@ getMin dict =
 removeMin : Dict k v -> Dict k v
 removeMin dict =
     case dict of
-        Node isRed key value ((Node _ _ _ _ _) as left) right ->
-            case left of
-                Node False _ _ lLeft _ ->
-                    case lLeft of
-                        Node True _ _ _ _ ->
-                            Node isRed key value (removeMin left) right
+        Node isRed key value ((Node lIsRed _ _ lLeft _) as left) right ->
+            if not lIsRed then
+                case lLeft of
+                    Node True _ _ _ _ ->
+                        Node isRed key value (removeMin left) right
 
-                        _ ->
-                            case moveRedLeft dict of
-                                Node isRed key value left right ->
-                                    balance isRed key value (removeMin left) right
+                    _ ->
+                        case moveRedLeft dict of
+                            Node isRed key value left right ->
+                                balance isRed key value (removeMin left) right
 
-                                Leaf ->
-                                    Leaf
-
-                _ ->
-                    Node isRed key value (removeMin left) right
+                            Leaf ->
+                                Leaf
+            else
+                Node isRed key value (removeMin left) right
 
         _ ->
             Leaf
@@ -374,19 +363,11 @@ moveRedRight dict =
     case dict of
         Node clr k v (Node lClr lK lV (Node True llK llV llLeft llRight) lRight) (Node rClr rK rV rLeft rRight) ->
             Node
-                clr
+                True
                 lK
                 lV
                 (Node False llK llV llLeft llRight)
-                (Node False k v lRight (Node (not rClr) rK rV rLeft rRight))
-
-        Node clr k v (Node lClr lK lV (Node True llK llV llLeft llRight) lRight) right ->
-            Node
-                (not clr)
-                lK
-                lV
-                (Node False llK llV llLeft llRight)
-                (Node False k v lRight right)
+                (Node False k v lRight (Node True rK rV rLeft rRight))
 
         Node clr k v (Node lClr lK lV lLeft lRight) (Node rClr rK rV rLeft rRight) ->
             Node
@@ -396,8 +377,8 @@ moveRedRight dict =
                 (Node (not lClr) lK lV lLeft lRight)
                 (Node (not rClr) rK rV rLeft rRight)
 
-        x ->
-            x
+        _ ->
+            dict
 
 
 {-| Update the value of a dictionary for a specific key with a given function.
