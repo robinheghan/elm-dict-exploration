@@ -70,6 +70,18 @@ import List exposing (..)
 import String
 
 
+{-
+   The following is an implementation of Left-Leaning Red Black Trees (LLRB Tree).
+   More information about this implementation can be found at the following links:
+
+   http://www.cs.princeton.edu/~rs/talks/LLRB/LLRB.pdf
+   http://www.cs.princeton.edu/~rs/talks/LLRB/RedBlack.pdf
+
+   The short of it is, that in addition to the regular rules for RB trees, the following rule
+   applies: No right references can be red.
+-}
+
+
 {-| A dictionary of keys and values. So a `(Dict String User)` is a dictionary
 that lets you look up a `String` (such as user names) and find the associated
 `User`.
@@ -169,6 +181,7 @@ insert key value dict =
             Leaf
 
         Node _ k v left right ->
+            -- Root node is always black
             Node False k v left right
 
 
@@ -176,6 +189,8 @@ insertHelp : comparable -> v -> Dict comparable v -> Dict comparable v
 insertHelp key value dict =
     case dict of
         Leaf ->
+            -- New nodes are always red. If it violates the rules, it will be fixed
+            -- when balancing.
             Node True key value Leaf Leaf
 
         Node nColor nKey nValue nLeft nRight ->
@@ -230,9 +245,16 @@ remove targetKey dict =
             Leaf
 
         Node _ k v left right ->
+            -- Root node is always black
             Node False k v left right
 
 
+{-| The easiest thing to remove from the tree, is a red node. However, when searching for the
+node to remove, we have no way of knowing if it will be red or not. This remove implementation
+makes sure that the bottom node is red by moving red colors down the tree through rotation
+and color flips. Any violations this will cause, can easily be fixed by balancing on the way
+up again.
+-}
 removeHelp : comparable -> Dict comparable v -> Dict comparable v
 removeHelp targetKey dict =
     case dict of
@@ -284,6 +306,9 @@ removeHelpPrepEQGT targetKey dict isRed key value left right =
                     dict
 
 
+{-| When we find the node we are looking for, we can remove by replacing the key-value
+pair with the key-value pair of the left-most node on the right side (the closest pair).
+-}
 removeHelpEQGT : comparable -> Dict comparable v -> Dict comparable v
 removeHelpEQGT targetKey dict =
     case dict of
