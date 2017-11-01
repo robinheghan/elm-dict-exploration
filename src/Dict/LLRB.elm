@@ -148,7 +148,7 @@ get targetKey dict =
             Nothing
 
         Node _ key value left right ->
-            case compare key targetKey of
+            case compare targetKey key of
                 EQ ->
                     Just value
 

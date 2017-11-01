@@ -123,6 +123,10 @@ tests =
                     \pairs ->
                         Dict.toList (Dict.fromList pairs)
                             |> Expect.equal (BaseDict.toList (BaseDict.fromList pairs))
+                , fuzz2 fuzzPairs pairRange "Get works" <|
+                    \pairs num ->
+                        Dict.get num (Dict.fromList pairs)
+                            |> Expect.equal (BaseDict.get num (BaseDict.fromList pairs))
                 , fuzz2 fuzzPairs pairRange "Insert works" <|
                     \pairs num ->
                         Dict.toList (Dict.insert num num (Dict.fromList pairs))
