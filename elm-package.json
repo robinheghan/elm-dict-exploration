@@ -1,5 +1,5 @@
 {
-    "version": "1.0.0",
+    "version": "1.0.1",
     "summary": "Exploring the dict implementation",
     "repository": "https://github.com/Skinney/elm-dict-exploration.git",
     "license": "BSD3",
@@ -7,7 +7,7 @@
         "src"
     ],
     "exposed-modules": [
-	"Dict.LLRB"
+        "Dict.LLRB"
     ],
     "dependencies": {
         "elm-lang/core": "5.1.1 <= v < 6.0.0",
