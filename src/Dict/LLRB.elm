@@ -156,14 +156,14 @@ get targetKey dict =
 
         Node _ key value left right ->
             case compare targetKey key of
-                EQ ->
-                    Just value
-
                 LT ->
                     get targetKey left
 
                 GT ->
                     get targetKey right
+
+                EQ ->
+                    Just value
 
 
 {-| Determine if a key is in a dictionary.
