@@ -86,12 +86,13 @@ import String
 that lets you look up a `String` (such as user names) and find the associated
 `User`.
 -}
-type Dict k v
+type Dict key value
     = Leaf
-      -- color key value left right
-    | Node Color k v (Dict k v) (Dict k v)
+    | Node Color key value (Dict key value) (Dict key value)
 
 
+{-| The color of a Node. Leafs are considered black.
+-}
 type Color
     = Black
     | Red
@@ -116,6 +117,7 @@ isEmpty dict =
 -}
 singleton : comparable -> v -> Dict comparable v
 singleton key value =
+    -- Root is always black
     Node Black key value Leaf Leaf
 
 
