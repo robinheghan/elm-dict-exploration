@@ -618,6 +618,8 @@ validateInvariants dict =
         "Not a 2-3 tree"
     else if not (isBalanced dict) then
         "Not balanced"
+    else if not (correctBlackHeight dict) then
+        "Black height tracking is off"
     else
         ""
 
@@ -703,3 +705,17 @@ isBalancedHelper node blacks =
                         blacks - 1
             in
                 isBalancedHelper left nextBlacks && isBalancedHelper right nextBlacks
+
+
+correctBlackHeight : Dict k v -> Bool
+correctBlackHeight node =
+    case node of
+        Leaf ->
+            True
+
+        Node _ height _ _ left right ->
+            let
+                correct =
+                    isBalancedBlacksHelper node 0
+            in
+                height == correct && correctBlackHeight left && correctBlackHeight right
