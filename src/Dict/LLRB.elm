@@ -385,17 +385,24 @@ moveRedLeft dict =
                 (Node Black rH rK rV rlR rRight)
 
         Node clr h k v (Node lClr lH lK lV lLeft lRight) (Node rClr rH rK rV rLeft rRight) ->
-            Node
-                Black
-                (if clr == Black then
-                    h - 1
-                 else
-                    h
-                )
-                k
-                v
-                (Node Red (lH - 1) lK lV lLeft lRight)
-                (Node Red (rH - 1) rK rV rLeft rRight)
+            case clr of
+                Black ->
+                    Node
+                        Black
+                        (h - 1)
+                        k
+                        v
+                        (Node Red (lH - 1) lK lV lLeft lRight)
+                        (Node Red (rH - 1) rK rV rLeft rRight)
+
+                Red ->
+                    Node
+                        Black
+                        h
+                        k
+                        v
+                        (Node Red (lH - 1) lK lV lLeft lRight)
+                        (Node Red (rH - 1) rK rV rLeft rRight)
 
         _ ->
             dict
@@ -414,17 +421,24 @@ moveRedRight dict =
                 (Node Black rH k v lRight (Node Red llH rK rV rLeft rRight))
 
         Node clr h k v (Node lClr lH lK lV lLeft lRight) (Node rClr rH rK rV rLeft rRight) ->
-            Node
-                Black
-                (if clr == Black then
-                    h - 1
-                 else
-                    h
-                )
-                k
-                v
-                (Node Red (lH - 1) lK lV lLeft lRight)
-                (Node Red (rH - 1) rK rV rLeft rRight)
+            case clr of
+                Black ->
+                    Node
+                        Black
+                        (h - 1)
+                        k
+                        v
+                        (Node Red (lH - 1) lK lV lLeft lRight)
+                        (Node Red (rH - 1) rK rV rLeft rRight)
+
+                Red ->
+                    Node
+                        Black
+                        h
+                        k
+                        v
+                        (Node Red (lH - 1) lK lV lLeft lRight)
+                        (Node Red (rH - 1) rK rV rLeft rRight)
 
         _ ->
             dict
