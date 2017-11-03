@@ -25,11 +25,20 @@ suite n =
                 (List.indexedMap (,) (List.range 51 100))
                 |> List.concat
 
+        setLs =
+            List.indexedMap (,) (List.range 75 175)
+
         original =
             Dict.fromList ls
 
         updated =
             Dict2.fromList ls
+
+        originalSetDict =
+            Dict.fromList setLs
+
+        updatedSetDict =
+            Dict2.fromList setLs
 
         keys =
             List.map (\( k, v ) -> k) ls
@@ -53,6 +62,15 @@ suite n =
             , Benchmark.compare "Update remove"
                 (benchmark4 "Original" updater Dict.update (\_ -> Nothing) keys original)
                 (benchmark4 "Updated" updater Dict2.update (\_ -> Nothing) keys updated)
+            , Benchmark.compare "Union"
+                (benchmark2 "Original" Dict.union original originalSetDict)
+                (benchmark2 "Updated" Dict2.union updated updatedSetDict)
+            , Benchmark.compare "Intersect"
+                (benchmark2 "Original" Dict.intersect original originalSetDict)
+                (benchmark2 "Updated" Dict2.intersect updated updatedSetDict)
+            , Benchmark.compare "Diff"
+                (benchmark2 "Original" Dict.diff original originalSetDict)
+                (benchmark2 "Updated" Dict2.diff updated updatedSetDict)
             ]
 
 

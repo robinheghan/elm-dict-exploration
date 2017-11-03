@@ -143,6 +143,30 @@ tests =
                     \pairs num ->
                         Dict.validateInvariants (Dict.remove num (Dict.fromList pairs))
                             |> Expect.equal ""
+                , fuzz2 fuzzPairs fuzzPairs "Union maintains invariant" <|
+                    \pairs pairs2 ->
+                        Dict.validateInvariants (Dict.union (Dict.fromList pairs) (Dict.fromList pairs2))
+                            |> Expect.equal ""
+                , fuzz2 fuzzPairs fuzzPairs "Union works" <|
+                    \pairs pairs2 ->
+                        Dict.toList (Dict.union (Dict.fromList pairs) (Dict.fromList pairs2))
+                            |> Expect.equal (BaseDict.toList (BaseDict.union (BaseDict.fromList pairs) (BaseDict.fromList pairs2)))
+                , fuzz2 fuzzPairs fuzzPairs "Intersect maintains invariant" <|
+                    \pairs pairs2 ->
+                        Dict.validateInvariants (Dict.intersect (Dict.fromList pairs) (Dict.fromList pairs2))
+                            |> Expect.equal ""
+                , fuzz2 fuzzPairs fuzzPairs "Intersect works" <|
+                    \pairs pairs2 ->
+                        Dict.toList (Dict.intersect (Dict.fromList pairs) (Dict.fromList pairs2))
+                            |> Expect.equal (BaseDict.toList (BaseDict.intersect (BaseDict.fromList pairs) (BaseDict.fromList pairs2)))
+                , fuzz2 fuzzPairs fuzzPairs "Diff maintains invariant" <|
+                    \pairs pairs2 ->
+                        Dict.validateInvariants (Dict.diff (Dict.fromList pairs) (Dict.fromList pairs2))
+                            |> Expect.equal ""
+                , fuzz2 fuzzPairs fuzzPairs "Diff works" <|
+                    \pairs pairs2 ->
+                        Dict.toList (Dict.diff (Dict.fromList pairs) (Dict.fromList pairs2))
+                            |> Expect.equal (BaseDict.toList (BaseDict.diff (BaseDict.fromList pairs) (BaseDict.fromList pairs2)))
                 ]
     in
         describe "Dict Tests"
