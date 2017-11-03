@@ -184,12 +184,12 @@ a collision.
 insert : comparable -> v -> Dict comparable v -> Dict comparable v
 insert key value dict =
     case insertHelp key value dict of
-        Leaf ->
-            Leaf
-
-        Node _ h k v left right ->
+        Node Red h k v left right ->
             -- Root node is always black
-            Node Black h k v left right
+            Node Black (h + 1) k v left right
+
+        x ->
+            x
 
 
 insertHelp : comparable -> v -> Dict comparable v -> Dict comparable v
@@ -198,7 +198,7 @@ insertHelp key value dict =
         Leaf ->
             -- New nodes are always red. If it violates the rules, it will be fixed
             -- when balancing.
-            Node Red 1 key value Leaf Leaf
+            Node Red 0 key value Leaf Leaf
 
         Node nColor nHeight nKey nValue nLeft nRight ->
             case compare key nKey of
@@ -223,21 +223,21 @@ balance color h key value left right =
                         h
                         key
                         value
-                        (Node Black lH lK lV lLeft lRight)
-                        (Node Black rH rK rV rLeft rRight)
+                        (Node Black (lH + 1) lK lV lLeft lRight)
+                        (Node Black (rH + 1) rK rV rLeft rRight)
 
                 _ ->
-                    Node color rH rK rV (Node Red h key value left rLeft) rRight
+                    Node color h rK rV (Node Red rH key value left rLeft) rRight
 
         _ ->
             case left of
                 Node Red lH lK lV (Node Red llH llK llV llLeft llRight) lRight ->
                     Node
                         Red
-                        lH
+                        h
                         lK
                         lV
-                        (Node Black llH llK llV llLeft llRight)
+                        (Node Black (llH + 1) llK llV llLeft llRight)
                         (Node Black h key value lRight right)
 
                 _ ->
@@ -250,12 +250,12 @@ no changes are made.
 remove : comparable -> Dict comparable v -> Dict comparable v
 remove targetKey dict =
     case removeHelp targetKey dict of
-        Leaf ->
-            Leaf
-
-        Node _ h k v left right ->
+        Node Red h k v left right ->
             -- Root node is always black
-            Node Black h k v left right
+            Node Black (h + 1) k v left right
+
+        x ->
+            x
 
 
 {-| The easiest thing to remove from the tree, is a red node. However, when searching for the
@@ -298,11 +298,11 @@ removeHelpPrepEQGT targetKey dict color height key value left right =
         Node Red lH lK lV lLeft lRight ->
             Node
                 color
-                lH
+                height
                 lK
                 lV
                 lLeft
-                (Node Red height key value lRight right)
+                (Node Red (height - 1) key value lRight right)
 
         _ ->
             case right of
@@ -378,20 +378,24 @@ moveRedLeft dict =
         Node clr h k v (Node lClr lH lK lV lLeft lRight) (Node rClr rH rK rV ((Node Red rlH rlK rlV rlL rlR) as rLeft) rRight) ->
             Node
                 Red
-                rlH
+                lH
                 rlK
                 rlV
-                (Node Black h k v (Node Red lH lK lV lLeft lRight) rlL)
+                (Node Black lH k v (Node Red rlH lK lV lLeft lRight) rlL)
                 (Node Black rH rK rV rlR rRight)
 
         Node clr h k v (Node lClr lH lK lV lLeft lRight) (Node rClr rH rK rV rLeft rRight) ->
             Node
                 Black
-                h
+                (if clr == Black then
+                    h - 1
+                 else
+                    h
+                )
                 k
                 v
-                (Node Red lH lK lV lLeft lRight)
-                (Node Red rH rK rV rLeft rRight)
+                (Node Red (lH - 1) lK lV lLeft lRight)
+                (Node Red (rH - 1) rK rV rLeft rRight)
 
         _ ->
             dict
@@ -406,17 +410,21 @@ moveRedRight dict =
                 lH
                 lK
                 lV
-                (Node Black llH llK llV llLeft llRight)
-                (Node Black h k v lRight (Node Red rH rK rV rLeft rRight))
+                (Node Black lH llK llV llLeft llRight)
+                (Node Black rH k v lRight (Node Red llH rK rV rLeft rRight))
 
         Node clr h k v (Node lClr lH lK lV lLeft lRight) (Node rClr rH rK rV rLeft rRight) ->
             Node
                 Black
-                h
+                (if clr == Black then
+                    h - 1
+                 else
+                    h
+                )
                 k
                 v
-                (Node Red lH lK lV lLeft lRight)
-                (Node Red rH rK rV rLeft rRight)
+                (Node Red (lH - 1) lK lV lLeft lRight)
+                (Node Red (rH - 1) rK rV rLeft rRight)
 
         _ ->
             dict
