@@ -537,7 +537,104 @@ to the first dictionary.
 -}
 union : Dict comparable v -> Dict comparable v -> Dict comparable v
 union t1 t2 =
-    foldl insert t2 t1
+    case ( t1, t2 ) of
+        ( _, Leaf ) ->
+            t1
+
+        ( Leaf, _ ) ->
+            turnBlack t2
+
+        ( _, Node _ _ key value left right ) ->
+            let
+                ( lt, gt ) =
+                    splitBy key t1
+            in
+                join key value (union lt left) (union gt right)
+
+
+turnBlack : Dict comparable v -> Dict comparable v
+turnBlack dict =
+    case dict of
+        Node Red h k v l r ->
+            Node Black h k v l r
+
+        x ->
+            x
+
+
+join : comparable -> v -> Dict comparable v -> Dict comparable v -> Dict comparable v
+join key value lt gt =
+    case ( lt, gt ) of
+        ( Leaf, _ ) ->
+            insert key value gt
+
+        ( _, Leaf ) ->
+            insert key value lt
+
+        ( Node _ h1 _ _ _ _, Node _ h2 _ _ _ _ ) ->
+            case compare h1 h2 of
+                LT ->
+                    turnBlack (joinLT key value h1 lt gt)
+
+                GT ->
+                    turnBlack (joinGT key value h2 lt gt)
+
+                EQ ->
+                    Node Black (h1 + 1) key value lt gt
+
+
+joinLT : comparable -> v -> Int -> Dict comparable v -> Dict comparable v -> Dict comparable v
+joinLT key value height lt gt =
+    case gt of
+        Node color gtH gtK gtV gtL gtR ->
+            if gtH == height then
+                Node Red (gtH + 1) key value lt gt
+            else
+                balance color gtH gtK gtV (joinLT key value height lt gtL) gtR
+
+        -- Cannot happen (consider Debug.crash)
+        Leaf ->
+            Leaf
+
+
+joinGT : comparable -> v -> Int -> Dict comparable v -> Dict comparable v -> Dict comparable v
+joinGT key value height lt gt =
+    case lt of
+        Node color ltH ltK ltV ltL ltR ->
+            if ltH == height then
+                Node Red (ltH + 1) key value lt gt
+            else
+                balance color ltH ltK ltV ltL (joinGT key value height ltR gt)
+
+        -- Cannot happen (consider Debug.crash)
+        Leaf ->
+            Leaf
+
+
+splitBy : comparable -> Dict comparable v -> ( Dict comparable v, Dict comparable v )
+splitBy key dict =
+    case dict of
+        Leaf ->
+            ( Leaf, Leaf )
+
+        Node _ _ nKey nVal left right ->
+            case compare key nKey of
+                LT ->
+                    let
+                        ( lt, gt ) =
+                            splitBy key left
+                    in
+                        ( lt, join nKey nVal gt right )
+
+                GT ->
+                    let
+                        ( lt, gt ) =
+                            splitBy key right
+                    in
+                        ( join nKey nVal left lt, gt )
+
+                EQ ->
+                    ( turnBlack left, right )
 
 
 {-| Keep a key-value pair when its key appears in the second dictionary.
