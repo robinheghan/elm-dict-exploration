@@ -183,13 +183,7 @@ a collision.
 -}
 insert : comparable -> v -> Dict comparable v -> Dict comparable v
 insert key value dict =
-    case insertHelp key value dict of
-        Node Red h k v left right ->
-            -- Root node is always black
-            Node Black (h + 1) k v left right
-
-        x ->
-            x
+    turnBlack (insertHelp key value dict)
 
 
 insertHelp : comparable -> v -> Dict comparable v -> Dict comparable v
@@ -198,7 +192,7 @@ insertHelp key value dict =
         Leaf ->
             -- New nodes are always red. If it violates the rules, it will be fixed
             -- when balancing.
-            Node Red 0 key value Leaf Leaf
+            Node Red 1 key value Leaf Leaf
 
         Node nColor nHeight nKey nValue nLeft nRight ->
             case compare key nKey of
@@ -220,11 +214,11 @@ balance color h key value left right =
                 Node Red lH lK lV lLeft lRight ->
                     Node
                         Red
-                        h
+                        (h + 1)
                         key
                         value
-                        (Node Black (lH + 1) lK lV lLeft lRight)
-                        (Node Black (rH + 1) rK rV rLeft rRight)
+                        (Node Black lH lK lV lLeft lRight)
+                        (Node Black rH rK rV rLeft rRight)
 
                 _ ->
                     Node color h rK rV (Node Red rH key value left rLeft) rRight
@@ -234,10 +228,10 @@ balance color h key value left right =
                 Node Red lH lK lV (Node Red llH llK llV llLeft llRight) lRight ->
                     Node
                         Red
-                        h
+                        (h + 1)
                         lK
                         lV
-                        (Node Black (llH + 1) llK llV llLeft llRight)
+                        (Node Black llH llK llV llLeft llRight)
                         (Node Black h key value lRight right)
 
                 _ ->
@@ -249,13 +243,7 @@ no changes are made.
 -}
 remove : comparable -> Dict comparable v -> Dict comparable v
 remove targetKey dict =
-    case removeHelp targetKey dict of
-        Node Red h k v left right ->
-            -- Root node is always black
-            Node Black (h + 1) k v left right
-
-        x ->
-            x
+    turnBlack (removeHelp targetKey dict)
 
 
 {-| The easiest thing to remove from the tree, is a red node. However, when searching for the
@@ -378,7 +366,7 @@ moveRedLeft dict =
         Node clr h k v (Node lClr lH lK lV lLeft lRight) (Node rClr rH rK rV ((Node Red rlH rlK rlV rlL rlR) as rLeft) rRight) ->
             Node
                 Red
-                lH
+                h
                 rlK
                 rlV
                 (Node Black lH k v (Node Red rlH lK lV lLeft lRight) rlL)
@@ -414,7 +402,7 @@ moveRedRight dict =
         Node clr h k v (Node lClr lH lK lV (Node Red llH llK llV llLeft llRight) lRight) (Node rClr rH rK rV rLeft rRight) ->
             Node
                 Red
-                lH
+                h
                 lK
                 lV
                 (Node Black lH llK llV llLeft llRight)
@@ -837,4 +825,4 @@ correctBlackHeight node =
                 correct =
                     isBalancedBlacksHelper node 0
             in
-                height == correct && correctBlackHeight left && correctBlackHeight right
+                height == correct

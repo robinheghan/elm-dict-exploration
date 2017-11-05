@@ -119,26 +119,26 @@ tests =
 
         fuzzTests =
             describe "Fuzz tests"
-                [ fuzz fuzzPairs "Converting to/from list works" <|
-                    \pairs ->
-                        Dict.toList (Dict.fromList pairs)
-                            |> Expect.equal (BaseDict.toList (BaseDict.fromList pairs))
-                , fuzz2 fuzzPairs pairRange "Get works" <|
+                [ fuzz2 fuzzPairs pairRange "Get works" <|
                     \pairs num ->
                         Dict.get num (Dict.fromList pairs)
                             |> Expect.equal (BaseDict.get num (BaseDict.fromList pairs))
+                , fuzz fuzzPairs "Converting to/from list works" <|
+                    \pairs ->
+                        Dict.toList (Dict.fromList pairs)
+                            |> Expect.equal (BaseDict.toList (BaseDict.fromList pairs))
                 , fuzz2 fuzzPairs pairRange "Insert works" <|
                     \pairs num ->
                         Dict.toList (Dict.insert num num (Dict.fromList pairs))
                             |> Expect.equal (BaseDict.toList (BaseDict.insert num num (BaseDict.fromList pairs)))
-                , fuzz2 fuzzPairs pairRange "Removal works" <|
-                    \pairs num ->
-                        Dict.toList (Dict.remove num (Dict.fromList pairs))
-                            |> Expect.equal (BaseDict.toList (BaseDict.remove num (BaseDict.fromList pairs)))
                 , fuzz2 fuzzPairs pairRange "Insert maintains invariant" <|
                     \pairs num ->
                         Dict.validateInvariants (Dict.insert num num (Dict.fromList pairs))
                             |> Expect.equal ""
+                , fuzz2 fuzzPairs pairRange "Removal works" <|
+                    \pairs num ->
+                        Dict.toList (Dict.remove num (Dict.fromList pairs))
+                            |> Expect.equal (BaseDict.toList (BaseDict.remove num (BaseDict.fromList pairs)))
                 , fuzz2 fuzzPairs pairRange "Remove maintains invariant" <|
                     \pairs num ->
                         Dict.validateInvariants (Dict.remove num (Dict.fromList pairs))
