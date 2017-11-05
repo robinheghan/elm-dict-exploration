@@ -628,14 +628,41 @@ Preference is given to values in the first dictionary.
 -}
 intersect : Dict comparable v -> Dict comparable v -> Dict comparable v
 intersect t1 t2 =
-    filter (\k _ -> member k t2) t1
+    case ( t1, t2 ) of
+        ( Leaf, _ ) ->
+            Leaf
+
+        ( _, Leaf ) ->
+            Leaf
+
+        ( _, Node _ _ key value left right ) ->
+            let
+                ( lt, gt ) =
+                    splitBy key t1
+            in
+                if member key t1 then
+                    join key value (intersect lt left) (intersect gt right)
+                else
+                    union (intersect lt left) (intersect gt right)
 
 
 {-| Keep a key-value pair when its key does not appear in the second dictionary.
 -}
 diff : Dict comparable v -> Dict comparable v -> Dict comparable v
 diff t1 t2 =
-    foldl (\k v t -> remove k t) t1 t2
+    case ( t1, t2 ) of
+        ( Leaf, _ ) ->
+            Leaf
+
+        ( _, Leaf ) ->
+            t1
+
+        ( _, Node _ _ key value left right ) ->
+            let
+                ( lt, gt ) =
+                    splitBy key t1
+            in
+                union (diff lt left) (diff gt right)
 
 
 {-| The most general way of combining two dictionaries. You provide three
