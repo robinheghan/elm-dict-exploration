@@ -532,10 +532,10 @@ union t1 t2 =
         ( Leaf, _ ) ->
             turnBlack t2
 
-        ( _, Node _ _ key value left right ) ->
+        ( Node _ _ key value left right, _ ) ->
             let
                 ( lt, gt ) =
-                    splitBy key t1
+                    splitBy key t2
             in
                 join key value (union lt left) (union gt right)
 
@@ -580,7 +580,6 @@ joinLT key value height lt gt =
             else
                 balance color gtH gtK gtV (joinLT key value height lt gtL) gtR
 
-        -- Cannot happen (consider Debug.crash)
         Leaf ->
             Leaf
 
@@ -594,7 +593,6 @@ joinGT key value height lt gt =
             else
                 balance color ltH ltK ltV ltL (joinGT key value height ltR gt)
 
-        -- Cannot happen (consider Debug.crash)
         Leaf ->
             Leaf
 
