@@ -4,6 +4,4 @@ This is an alternate implementation for `Dict` in Elm. The implementation used i
 
     import Dict.LLRB as Dict exposing (Dict)
 
-You can expect better performance for `get` (due to better balancing), `insert` due to simpler balancing and `remove` (again, simpler balancing). However, `update` will be slower.
-
-This implementation is also shorter, so you should see a minor code reduction as well.
+You can expect better performance for `insert`, `remove`, `union`, `intersect`, `diff` and any operation implemented with these functions.
