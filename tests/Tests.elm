@@ -45,11 +45,12 @@ tests =
                 , test "update Nothing" <| \() -> Expect.equal Dict.empty (Dict.update "k" (\v -> Nothing) (Dict.singleton "k" "v"))
                 , test "remove" <| \() -> Expect.equal Dict.empty (Dict.remove "k" (Dict.singleton "k" "v"))
                 , test "remove not found" <| \() -> Expect.equal (Dict.singleton "k" "v") (Dict.remove "kk" (Dict.singleton "k" "v"))
-                , describe "fromList"
+                , test "fromList excludes duplicates" <| \() -> Expect.equal (Dict.singleton 1 1) (Dict.fromList [ ( 1, 1 ), ( 1, 1 ) ])
+                , describe "fromList builds a valid Dict"
                     (List.range 1 100
                         |> List.map
                             (\n ->
-                                test ("builds a valid Dict of size " ++ toString n) <|
+                                test ("of size " ++ toString n) <|
                                     \() ->
                                         let
                                             list =
