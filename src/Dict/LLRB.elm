@@ -642,12 +642,12 @@ intersect t1 t2 =
         ( _, Leaf ) ->
             Leaf
 
-        ( _, Node _ _ key value left right ) ->
+        ( Node _ _ key value left right, _ ) ->
             let
                 ( lt, gt ) =
-                    splitBy key t1
+                    splitBy key t2
             in
-                if member key t1 then
+                if member key t2 then
                     join key value (intersect lt left) (intersect gt right)
                 else
                     union (intersect lt left) (intersect gt right)
