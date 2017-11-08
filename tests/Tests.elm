@@ -45,6 +45,22 @@ tests =
                 , test "update Nothing" <| \() -> Expect.equal Dict.empty (Dict.update "k" (\v -> Nothing) (Dict.singleton "k" "v"))
                 , test "remove" <| \() -> Expect.equal Dict.empty (Dict.remove "k" (Dict.singleton "k" "v"))
                 , test "remove not found" <| \() -> Expect.equal (Dict.singleton "k" "v") (Dict.remove "kk" (Dict.singleton "k" "v"))
+                , describe "fromList"
+                    (List.range 1 100
+                        |> List.map
+                            (\n ->
+                                test ("builds a valid Dict of size " ++ toString n) <|
+                                    \() ->
+                                        let
+                                            list =
+                                                List.range 1 n |> List.indexedMap (,)
+
+                                            dict =
+                                                Dict.fromList list
+                                        in
+                                            Expect.equal ( Dict.validateInvariants dict, Dict.toList dict ) ( "", list )
+                            )
+                    )
                 ]
 
         queryTests =

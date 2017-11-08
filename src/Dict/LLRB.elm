@@ -23,7 +23,7 @@ module Dict.LLRB
         , values
         , toList
         , fromList
-          --, validateInvariants
+        , validateInvariants
         )
 
 {-| A dictionary mapping unique keys to values. The keys can be any comparable
@@ -734,8 +734,134 @@ toList dict =
 {-| Convert an association list into a dictionary.
 -}
 fromList : List ( comparable, v ) -> Dict comparable v
-fromList assocs =
-    List.foldl (\( key, value ) dict -> insert key value dict) empty assocs
+fromList =
+    List.sortBy Tuple.first >> removeRepeats >> fromSortedList False
+
+
+{-| Remove consecutive duplicates, where last duplicate wins. (reverses order)
+-}
+removeRepeats : List ( comparable, v ) -> List ( comparable, v )
+removeRepeats list =
+    case list of
+        x :: list ->
+            removeRepeatsHelp [] x list
+
+        [] ->
+            []
+
+
+removeRepeatsHelp : List ( comparable, v ) -> ( comparable, v ) -> List ( comparable, v ) -> List ( comparable, v )
+removeRepeatsHelp revList (( key, _ ) as pair) list =
+    case list of
+        (( nextKey, _ ) as nextPair) :: rest ->
+            if key == nextKey then
+                removeRepeatsHelp (revList) nextPair rest
+            else
+                removeRepeatsHelp (pair :: revList) nextPair rest
+
+        [] ->
+            pair :: revList
+
+
+{-| Convert an association list with sorted and distinct keys into a dictionary.
+-}
+fromSortedList : Bool -> List ( k, v ) -> Dict k v
+fromSortedList isAsc list =
+    case list of
+        [] ->
+            Leaf
+
+        x :: rest ->
+            sortedListToNodeList isAsc [] x rest |> fromNodeList 2 isAsc
+
+
+{-| Represents a non-empty list of nodes separated by key-value pairs.
+-}
+type alias NodeList k v =
+    ( Dict k v, List ( ( k, v ), Dict k v ) )
+
+
+{-| Convert a non-empty association list to the bottom level of nodes separated
+by key-value pairs. (reverses order)
+-}
+sortedListToNodeList : Bool -> List ( ( k, v ), Dict k v ) -> ( k, v ) -> List ( k, v ) -> NodeList k v
+sortedListToNodeList isAsc revList a list =
+    case list of
+        [] ->
+            ( node2 1 Leaf a Leaf, revList )
+
+        b :: [] ->
+            if isAsc then
+                ( node3 1 Leaf a Leaf b Leaf, revList )
+            else
+                ( node3 1 Leaf b Leaf a Leaf, revList )
+
+        b :: c :: [] ->
+            ( node2 1 Leaf c Leaf, ( b, node2 1 Leaf a Leaf ) :: revList )
+
+        b :: c :: d :: rest ->
+            if isAsc then
+                sortedListToNodeList isAsc (( c, node3 1 Leaf a Leaf b Leaf ) :: revList) d rest
+            else
+                sortedListToNodeList isAsc (( c, node3 1 Leaf b Leaf a Leaf ) :: revList) d rest
+
+
+{-| Gather up a NodeList one level at a time, in successive passes of alternating
+direction, until a single root-node remains.
+-}
+fromNodeList : Int -> Bool -> NodeList k v -> Dict k v
+fromNodeList h isReversed nodeList =
+    case nodeList of
+        ( node, [] ) ->
+            node
+
+        ( a, ( p1, b ) :: list ) ->
+            accumulateNodeList h isReversed [] a p1 b list
+                |> fromNodeList (h + 1) (not isReversed)
+
+
+{-| Gather up a NodeList to the next level. (reverses order)
+-}
+accumulateNodeList : Int -> Bool -> List ( ( k, v ), Dict k v ) -> Dict k v -> ( k, v ) -> Dict k v -> List ( ( k, v ), Dict k v ) -> NodeList k v
+accumulateNodeList h isReversed revList a p1 b list =
+    case list of
+        [] ->
+            if isReversed then
+                ( node2 h b p1 a, revList )
+            else
+                ( node2 h a p1 b, revList )
+
+        ( p2, c ) :: [] ->
+            if isReversed then
+                ( node3 h c p2 b p1 a, revList )
+            else
+                ( node3 h a p1 b p2 c, revList )
+
+        ( p2, c ) :: ( p3, d ) :: [] ->
+            if isReversed then
+                ( node2 h d p3 c, ( p2, node2 h b p1 a ) :: revList )
+            else
+                ( node2 h c p3 d, ( p2, node2 h a p1 b ) :: revList )
+
+        ( p2, c ) :: ( p3, d ) :: ( p4, e ) :: rest ->
+            if isReversed then
+                accumulateNodeList h isReversed (( p3, node3 h c p2 b p1 a ) :: revList) d p4 e rest
+            else
+                accumulateNodeList h isReversed (( p3, node3 h a p1 b p2 c ) :: revList) d p4 e rest
+
+
+
+-- node constructors
+
+
+node2 : Int -> Dict k v -> ( k, v ) -> Dict k v -> Dict k v
+node2 h a ( k1, v1 ) b =
+    Node Black h k1 v1 a b
+
+
+node3 : Int -> Dict k v -> ( k, v ) -> Dict k v -> ( k, v ) -> Dict k v -> Dict k v
+node3 h a ( k1, v1 ) b ( k2, v2 ) c =
+    Node Black h k2 v2 (Node Red h k1 v1 a b) c
 
 
 

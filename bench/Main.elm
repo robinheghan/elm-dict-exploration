@@ -6,6 +6,10 @@ import Dict
 import Dict.LLRB as Dict2
 
 
+( dictName, dict2Name ) =
+    ( "Dict", "LLRB" )
+
+
 main : BenchmarkProgram
 main =
     program <| suite 100
@@ -14,19 +18,20 @@ main =
 suite : Int -> Benchmark
 suite n =
     let
-        halfwayPoint =
-            n // 2
+        q =
+            n // 4
 
         ls =
-            List.map3
-                (\a b c -> [ a, b, c ])
-                (List.indexedMap (,) (List.range 0 50))
-                (List.indexedMap (,) (List.range 25 75 |> List.reverse))
-                (List.indexedMap (,) (List.range 51 100))
+            List.map4
+                (\a b c d -> [ a, b, c, d ])
+                (List.map (\i -> ( i, i )) (List.range 1 q))
+                (List.map (\i -> ( i, i )) (List.range (q + 1) (2 * q) |> List.reverse))
+                (List.map (\i -> ( i, i )) (List.range (2 * q + 1) (3 * q)))
+                (List.map (\i -> ( i, i )) (List.range (3 * q + 1) n))
                 |> List.concat
 
         setLs =
-            List.indexedMap (,) (List.range 75 175)
+            List.indexedMap (,) (List.range 1 n)
 
         original =
             Dict.fromList ls
@@ -43,34 +48,37 @@ suite n =
         keys =
             List.map (\( k, v ) -> k) ls
     in
-        describe (toString n ++ " elements")
-            [ Benchmark.compare "Get"
-                (benchmark3 "Original" getter Dict.get keys original)
-                (benchmark3 "Updated" getter Dict2.get keys updated)
-            , Benchmark.compare "Insert"
-                (benchmark1 "Original" Dict.fromList ls)
-                (benchmark1 "Updated" Dict2.fromList ls)
-            , Benchmark.compare "Remove"
-                (benchmark3 "Original" remover Dict.remove keys original)
-                (benchmark3 "Updated" remover Dict2.remove keys updated)
-            , Benchmark.compare "Remove one item"
-                (benchmark3 "Original" singleRemover Dict.remove keys original)
-                (benchmark3 "Updated" singleRemover Dict2.remove keys updated)
-            , Benchmark.compare "Update insert"
-                (benchmark4 "Original" updater Dict.update (\_ -> Just -1) keys original)
-                (benchmark4 "Updated" updater Dict2.update (\_ -> Just -1) keys updated)
-            , Benchmark.compare "Update remove"
-                (benchmark4 "Original" updater Dict.update (\_ -> Nothing) keys original)
-                (benchmark4 "Updated" updater Dict2.update (\_ -> Nothing) keys updated)
-            , Benchmark.compare "Union"
-                (benchmark2 "Original" Dict.union original originalSetDict)
-                (benchmark2 "Updated" Dict2.union updated updatedSetDict)
-            , Benchmark.compare "Intersect"
-                (benchmark2 "Original" Dict.intersect original originalSetDict)
-                (benchmark2 "Updated" Dict2.intersect updated updatedSetDict)
-            , Benchmark.compare "Diff"
-                (benchmark2 "Original" Dict.diff original originalSetDict)
-                (benchmark2 "Updated" Dict2.diff updated updatedSetDict)
+        describe (toString (Dict.size original) ++ " elements")
+            [ Benchmark.compare "get"
+                (benchmark3 dictName getter Dict.get keys original)
+                (benchmark3 dict2Name getter Dict2.get keys updated)
+            , Benchmark.compare "fromList"
+                (benchmark1 dictName Dict.fromList ls)
+                (benchmark1 dict2Name Dict2.fromList ls)
+            , Benchmark.compare "insert"
+                (benchmark1 dictName (List.foldl (uncurry Dict.insert) Dict.empty) ls)
+                (benchmark1 dict2Name (List.foldl (uncurry Dict2.insert) Dict2.empty) ls)
+            , Benchmark.compare "remove (until empty)"
+                (benchmark3 dictName remover Dict.remove keys original)
+                (benchmark3 dict2Name remover Dict2.remove keys updated)
+            , Benchmark.compare "remove (one item)"
+                (benchmark3 dictName singleRemover Dict.remove keys original)
+                (benchmark3 dict2Name singleRemover Dict2.remove keys updated)
+            , Benchmark.compare "update insert"
+                (benchmark4 dictName updater Dict.update (\_ -> Just -1) keys original)
+                (benchmark4 dict2Name updater Dict2.update (\_ -> Just -1) keys updated)
+            , Benchmark.compare "update remove"
+                (benchmark4 dictName updater Dict.update (\_ -> Nothing) keys original)
+                (benchmark4 dict2Name updater Dict2.update (\_ -> Nothing) keys updated)
+            , Benchmark.compare "union"
+                (benchmark2 dictName Dict.union original originalSetDict)
+                (benchmark2 dict2Name Dict2.union updated updatedSetDict)
+            , Benchmark.compare "intersect"
+                (benchmark2 dictName Dict.intersect original originalSetDict)
+                (benchmark2 dict2Name Dict2.intersect updated updatedSetDict)
+            , Benchmark.compare "diff"
+                (benchmark2 dictName Dict.diff original originalSetDict)
+                (benchmark2 dict2Name Dict2.diff updated updatedSetDict)
             ]
 
 
