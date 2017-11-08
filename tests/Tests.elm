@@ -58,7 +58,7 @@ tests =
                                             dict =
                                                 Dict.fromList list
                                         in
-                                            Expect.equal ( Dict.validateInvariants dict, Dict.toList dict ) ( "", list )
+                                            Expect.equal ( "", list ) ( Dict.validateInvariants dict, Dict.toList dict )
                             )
                     )
                 ]
@@ -84,7 +84,9 @@ tests =
         transformTests =
             describe "transform Tests"
                 [ test "filter" <| \() -> Expect.equal (Dict.singleton "Tom" "cat") (Dict.filter (\k v -> k == "Tom") animals)
+                , test "filter (numbers)" <| \() -> Expect.equal [ 2, 4, 6, 8, 10 ] (List.range 1 10 |> List.indexedMap (,) |> Dict.fromList |> Dict.filter (\_ v -> v % 2 == 0) |> Dict.values)
                 , test "partition" <| \() -> Expect.equal ( Dict.singleton "Tom" "cat", Dict.singleton "Jerry" "mouse" ) (Dict.partition (\k v -> k == "Tom") animals)
+                , test "partition (numbers)" <| \() -> Expect.equal ( [ 2, 4, 6, 8, 10 ], [ 1, 3, 5, 7, 9 ] ) (List.range 1 10 |> List.indexedMap (,) |> Dict.fromList |> Dict.partition (\_ v -> v % 2 == 0) |> (\( a, b ) -> ( Dict.values a, Dict.values b )))
                 ]
 
         mergeTests =

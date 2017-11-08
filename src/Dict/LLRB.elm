@@ -23,7 +23,7 @@ module Dict.LLRB
         , values
         , toList
         , fromList
-        , validateInvariants
+          --, validateInvariants
         )
 
 {-| A dictionary mapping unique keys to values. The keys can be any comparable
@@ -464,14 +464,16 @@ map f dict =
 -}
 filter : (comparable -> v -> Bool) -> Dict comparable v -> Dict comparable v
 filter predicate dict =
-    let
-        helper key value acc =
+    foldr
+        (\key value list ->
             if predicate key value then
-                insert key value acc
+                ( key, value ) :: list
             else
-                acc
-    in
-        foldl helper empty dict
+                list
+        )
+        []
+        dict
+        |> fromSortedList True
 
 
 {-| Fold over the key-value pairs in a dictionary, in order from lowest
@@ -507,13 +509,18 @@ contains the rest.
 partition : (comparable -> v -> Bool) -> Dict comparable v -> ( Dict comparable v, Dict comparable v )
 partition predicate dict =
     let
-        helper key value ( trues, falses ) =
-            if predicate key value then
-                ( insert key value trues, falses )
-            else
-                ( trues, insert key value falses )
+        ( list1, list2 ) =
+            foldr
+                (\key value ( list1, list2 ) ->
+                    if predicate key value then
+                        ( ( key, value ) :: list1, list2 )
+                    else
+                        ( list1, ( key, value ) :: list2 )
+                )
+                ( [], [] )
+                dict
     in
-        foldl helper ( empty, empty ) dict
+        ( fromSortedList True list1, fromSortedList True list2 )
 
 
 

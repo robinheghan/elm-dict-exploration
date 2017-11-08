@@ -79,6 +79,12 @@ suite n =
             , Benchmark.compare "diff"
                 (benchmark2 dictName Dict.diff original originalSetDict)
                 (benchmark2 dict2Name Dict2.diff updated updatedSetDict)
+            , Benchmark.compare "filter"
+                (benchmark2 dictName Dict.filter (\k _ -> k % 2 == 0) original)
+                (benchmark2 dict2Name Dict2.filter (\k _ -> k % 2 == 0) updated)
+            , Benchmark.compare "partition"
+                (benchmark2 dictName Dict.partition (\k _ -> k % 2 == 0) original)
+                (benchmark2 dict2Name Dict2.partition (\k _ -> k % 2 == 0) updated)
             ]
 
 
