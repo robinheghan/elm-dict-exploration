@@ -17,92 +17,167 @@ main =
 
 suite : Int -> Benchmark
 suite n =
+    describe (toString n ++ " elements")
+        [ suiteBuild n
+        , suiteQuery n
+        , suiteModify n
+        , suiteCombineContiguous n
+        , suiteCombineFragmented n
+        , suiteTransform n
+        ]
+
+
+suiteBuild : Int -> Benchmark
+suiteBuild n =
     let
+        -- mix up list
         q =
             n // 4
 
-        ls =
+        assocList =
             List.map4
                 (\a b c d -> [ a, b, c, d ])
-                (List.map (\i -> ( i, i )) (List.range 1 q))
-                (List.map (\i -> ( i, i )) (List.range (q + 1) (2 * q) |> List.reverse))
-                (List.map (\i -> ( i, i )) (List.range (2 * q + 1) (3 * q)))
-                (List.map (\i -> ( i, i )) (List.range (3 * q + 1) n))
+                (assocListRange 1 q)
+                (assocListRange (q + 1) (2 * q) |> List.reverse)
+                (assocListRange (2 * q + 1) (3 * q))
+                (assocListRange (3 * q + 1) n |> List.reverse)
                 |> List.concat
-
-        setLs =
-            List.indexedMap (,) (List.range 1 n)
-
-        original =
-            Dict.fromList ls
-
-        updated =
-            Dict2.fromList ls
-
-        originalSetDict =
-            Dict.fromList setLs
-
-        updatedSetDict =
-            Dict2.fromList setLs
-
-        keys =
-            List.map (\( k, v ) -> k) ls
     in
-        describe (toString (Dict.size original) ++ " elements")
-            [ Benchmark.compare "get"
-                (benchmark3 dictName getter Dict.get keys original)
-                (benchmark3 dict2Name getter Dict2.get keys updated)
-            , Benchmark.compare "fromList"
-                (benchmark1 dictName Dict.fromList ls)
-                (benchmark1 dict2Name Dict2.fromList ls)
-            , Benchmark.compare "insert"
-                (benchmark1 dictName (List.foldl (uncurry Dict.insert) Dict.empty) ls)
-                (benchmark1 dict2Name (List.foldl (uncurry Dict2.insert) Dict2.empty) ls)
-            , Benchmark.compare "remove (until empty)"
-                (benchmark3 dictName remover Dict.remove keys original)
-                (benchmark3 dict2Name remover Dict2.remove keys updated)
-            , Benchmark.compare "remove (one item)"
-                (benchmark3 dictName singleRemover Dict.remove keys original)
-                (benchmark3 dict2Name singleRemover Dict2.remove keys updated)
-            , Benchmark.compare "update insert"
-                (benchmark4 dictName updater Dict.update (\_ -> Just -1) keys original)
-                (benchmark4 dict2Name updater Dict2.update (\_ -> Just -1) keys updated)
-            , Benchmark.compare "update remove"
-                (benchmark4 dictName updater Dict.update (\_ -> Nothing) keys original)
-                (benchmark4 dict2Name updater Dict2.update (\_ -> Nothing) keys updated)
-            , Benchmark.compare "union"
-                (benchmark2 dictName Dict.union original originalSetDict)
-                (benchmark2 dict2Name Dict2.union updated updatedSetDict)
-            , Benchmark.compare "intersect"
-                (benchmark2 dictName Dict.intersect original originalSetDict)
-                (benchmark2 dict2Name Dict2.intersect updated updatedSetDict)
-            , Benchmark.compare "diff"
-                (benchmark2 dictName Dict.diff original originalSetDict)
-                (benchmark2 dict2Name Dict2.diff updated updatedSetDict)
-            , Benchmark.compare "filter"
-                (benchmark2 dictName Dict.filter (\k _ -> k % 2 == 0) original)
-                (benchmark2 dict2Name Dict2.filter (\k _ -> k % 2 == 0) updated)
-            , Benchmark.compare "partition"
-                (benchmark2 dictName Dict.partition (\k _ -> k % 2 == 0) original)
-                (benchmark2 dict2Name Dict2.partition (\k _ -> k % 2 == 0) updated)
+        describe "Build"
+            [ Benchmark.compare "fromList"
+                (benchmark1 dictName Dict.fromList assocList)
+                (benchmark1 dict2Name Dict2.fromList assocList)
+            , Benchmark.compare "insert (from empty)"
+                (benchmark3 dictName List.foldl (uncurry Dict.insert) Dict.empty assocList)
+                (benchmark3 dict2Name List.foldl (uncurry Dict2.insert) Dict2.empty assocList)
             ]
 
 
-getter : (a -> b -> c) -> List a -> b -> List c
-getter f keys dict =
-    List.foldl (\k acc -> f k dict :: acc) [] keys
+suiteQuery : Int -> Benchmark
+suiteQuery n =
+    let
+        assocList =
+            assocListRange 1 n
+
+        keys =
+            assocList |> List.map Tuple.first
+
+        ( dict, dict2 ) =
+            ( Dict.fromList assocList, Dict2.fromList assocList )
+    in
+        describe "Query"
+            [ Benchmark.compare "get"
+                (benchmark2 dictName List.map ((flip Dict.get) dict) keys)
+                (benchmark2 dict2Name List.map ((flip Dict2.get) dict2) keys)
+            ]
 
 
-updater : (a -> b -> c -> c) -> b -> List a -> c -> c
-updater f1 f2 keys dict =
-    List.foldl (\k acc -> f1 k f2 acc) dict keys
+suiteModify : Int -> Benchmark
+suiteModify n =
+    let
+        -- make dicts from evens; use odds to double their size
+        ( evens, odds ) =
+            assocListRange 1 (2 * n) |> List.partition (\( k, _ ) -> k % 2 == 0)
+
+        ( keys, oddKeys ) =
+            ( evens |> List.map Tuple.first, odds |> List.map Tuple.first )
+
+        ( dict, dict2 ) =
+            ( Dict.fromList evens, Dict2.fromList evens )
+    in
+        describe "Modify"
+            [ Benchmark.compare "insert (doubling size)"
+                (benchmark3 dictName List.foldl (uncurry Dict.insert) dict odds)
+                (benchmark3 dict2Name List.foldl (uncurry Dict2.insert) dict2 odds)
+            , Benchmark.compare "remove (until empty)"
+                (benchmark3 dictName List.foldl Dict.remove dict keys)
+                (benchmark3 dict2Name List.foldl Dict2.remove dict2 keys)
+            , Benchmark.compare "remove (only one)"
+                (benchmark2 dictName List.map ((flip Dict.remove) dict) keys)
+                (benchmark2 dict2Name List.map ((flip Dict2.remove) dict2) keys)
+            , Benchmark.compare "update (modify all)"
+                (benchmark3 dictName List.foldl ((flip Dict.update) (\_ -> Just 0)) dict keys)
+                (benchmark3 dict2Name List.foldl ((flip Dict2.update) (\_ -> Just 0)) dict2 keys)
+            , Benchmark.compare "update (remove all)"
+                (benchmark3 dictName List.foldl ((flip Dict.update) (\_ -> Nothing)) dict keys)
+                (benchmark3 dict2Name List.foldl ((flip Dict2.update) (\_ -> Nothing)) dict2 keys)
+            , Benchmark.compare "update (insert, doubling size)"
+                (benchmark3 dictName List.foldl ((flip Dict.update) (\_ -> Just 0)) dict oddKeys)
+                (benchmark3 dict2Name List.foldl ((flip Dict2.update) (\_ -> Just 0)) dict2 oddKeys)
+            ]
 
 
-remover : (a -> b -> b) -> List a -> b -> b
-remover f keys dict =
-    List.foldl (\k acc -> f k acc) dict keys
+suiteCombineContiguous : Int -> Benchmark
+suiteCombineContiguous n =
+    let
+        ( list, shiftedList ) =
+            ( assocListRange 1 n, assocListRange (n // 2 + 1) (n // 2 + n) )
+
+        ( left, right ) =
+            ( Dict.fromList list, Dict.fromList shiftedList )
+
+        ( left2, right2 ) =
+            ( Dict2.fromList list, Dict2.fromList shiftedList )
+    in
+        describe "Combine (contiguous intersection)"
+            [ Benchmark.compare "union"
+                (benchmark2 dictName Dict.union left right)
+                (benchmark2 dict2Name Dict2.union left2 right2)
+            , Benchmark.compare "intersect"
+                (benchmark2 dictName Dict.intersect left right)
+                (benchmark2 dict2Name Dict2.intersect left2 right2)
+            , Benchmark.compare "diff"
+                (benchmark2 dictName Dict.diff left right)
+                (benchmark2 dict2Name Dict2.diff left2 right2)
+            ]
 
 
-singleRemover : (a -> b -> c) -> List a -> b -> List c
-singleRemover f keys dict =
-    List.foldl (\k acc -> f k dict :: acc) [] keys
+suiteCombineFragmented : Int -> Benchmark
+suiteCombineFragmented n =
+    let
+        ( multiples2, multiples3 ) =
+            ( assocListRange 1 (2 * n) |> List.filter (\( k, _ ) -> k % 2 == 0)
+            , assocListRange 1 (3 * n) |> List.filter (\( k, _ ) -> k % 3 == 0)
+            )
+
+        ( left, right ) =
+            ( Dict.fromList multiples2, Dict.fromList multiples3 )
+
+        ( left2, right2 ) =
+            ( Dict2.fromList multiples2, Dict2.fromList multiples3 )
+    in
+        describe "Combine (fragmented intersection)"
+            [ Benchmark.compare "union"
+                (benchmark2 dictName Dict.union left right)
+                (benchmark2 dict2Name Dict2.union left2 right2)
+            , Benchmark.compare "intersect"
+                (benchmark2 dictName Dict.intersect left right)
+                (benchmark2 dict2Name Dict2.intersect left2 right2)
+            , Benchmark.compare "diff"
+                (benchmark2 dictName Dict.diff left right)
+                (benchmark2 dict2Name Dict2.diff left2 right2)
+            ]
+
+
+suiteTransform : Int -> Benchmark
+suiteTransform n =
+    let
+        assocList =
+            assocListRange 1 n
+
+        ( dict, dict2 ) =
+            ( Dict.fromList assocList, Dict2.fromList assocList )
+    in
+        describe "Transform"
+            [ Benchmark.compare "filter"
+                (benchmark2 dictName Dict.filter (\k _ -> k % 2 == 0) dict)
+                (benchmark2 dict2Name Dict2.filter (\k _ -> k % 2 == 0) dict2)
+            , Benchmark.compare "partition"
+                (benchmark2 dictName Dict.partition (\k _ -> k % 2 == 0) dict)
+                (benchmark2 dict2Name Dict2.partition (\k _ -> k % 2 == 0) dict2)
+            ]
+
+
+assocListRange : Int -> Int -> List ( Int, Int )
+assocListRange start end =
+    List.range start end |> List.map (\x -> ( x, x ))
