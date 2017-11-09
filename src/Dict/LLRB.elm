@@ -23,7 +23,7 @@ module Dict.LLRB
         , values
         , toList
         , fromList
-          --, validateInvariants
+        , validateInvariants
         )
 
 {-| A dictionary mapping unique keys to values. The keys can be any comparable
@@ -432,6 +432,16 @@ moveRedRight dict =
             dict
 
 
+turnBlack : Dict comparable v -> Dict comparable v
+turnBlack dict =
+    case dict of
+        Node Red h k v l r ->
+            Node Black h k v l r
+
+        x ->
+            x
+
+
 {-| Update the value of a dictionary for a specific key with a given function.
 -}
 update : comparable -> (Maybe v -> Maybe v) -> Dict comparable v -> Dict comparable v
@@ -531,145 +541,68 @@ partition predicate dict =
 to the first dictionary.
 -}
 union : Dict comparable v -> Dict comparable v -> Dict comparable v
-union t1 t2 =
-    case ( t1, t2 ) of
-        ( _, Leaf ) ->
-            t1
-
-        ( Leaf, _ ) ->
-            turnBlack t2
-
-        ( Node _ _ key value left right, _ ) ->
-            let
-                ( lt, gt ) =
-                    splitBy key t2
-            in
-                join key value (union lt left) (union gt right)
+union lDict rDict =
+    foldl unionAccumulator ( [], toList rDict ) lDict |> uncurry (List.foldl (::)) |> fromSortedList False
 
 
-turnBlack : Dict comparable v -> Dict comparable v
-turnBlack dict =
-    case dict of
-        Node Red h k v l r ->
-            Node Black h k v l r
+unionAccumulator : comparable -> v -> ( List ( comparable, v ), List ( comparable, v ) ) -> ( List ( comparable, v ), List ( comparable, v ) )
+unionAccumulator lKey lVal ( result, rList ) =
+    case rList of
+        [] ->
+            ( ( lKey, lVal ) :: result, [] )
 
-        x ->
-            x
-
-
-join : comparable -> v -> Dict comparable v -> Dict comparable v -> Dict comparable v
-join key value lt gt =
-    case ( lt, gt ) of
-        ( Leaf, _ ) ->
-            insert key value gt
-
-        ( _, Leaf ) ->
-            insert key value lt
-
-        ( Node _ h1 _ _ _ _, Node _ h2 _ _ _ _ ) ->
-            case compare h1 h2 of
-                LT ->
-                    turnBlack (joinLT key value h1 lt gt)
-
-                GT ->
-                    turnBlack (joinGT key value h2 lt gt)
-
-                EQ ->
-                    Node Black (h1 + 1) key value lt gt
-
-
-joinLT : comparable -> v -> Int -> Dict comparable v -> Dict comparable v -> Dict comparable v
-joinLT key value height lt gt =
-    case gt of
-        Node color gtH gtK gtV gtL gtR ->
-            if gtH == height then
-                Node Red (gtH + 1) key value lt gt
+        ( rKey, rVal ) :: rRest ->
+            if lKey == rKey then
+                ( ( lKey, lVal ) :: result, rRest )
+            else if lKey < rKey then
+                ( ( lKey, lVal ) :: result, rList )
             else
-                balance color gtH gtK gtV (joinLT key value height lt gtL) gtR
-
-        Leaf ->
-            Leaf
-
-
-joinGT : comparable -> v -> Int -> Dict comparable v -> Dict comparable v -> Dict comparable v
-joinGT key value height lt gt =
-    case lt of
-        Node color ltH ltK ltV ltL ltR ->
-            if ltH == height then
-                Node Red (ltH + 1) key value lt gt
-            else
-                balance color ltH ltK ltV ltL (joinGT key value height ltR gt)
-
-        Leaf ->
-            Leaf
-
-
-splitBy : comparable -> Dict comparable v -> ( Dict comparable v, Dict comparable v )
-splitBy key dict =
-    case dict of
-        Leaf ->
-            ( Leaf, Leaf )
-
-        Node _ _ nKey nVal left right ->
-            case compare key nKey of
-                LT ->
-                    let
-                        ( lt, gt ) =
-                            splitBy key left
-                    in
-                        ( lt, join nKey nVal gt right )
-
-                GT ->
-                    let
-                        ( lt, gt ) =
-                            splitBy key right
-                    in
-                        ( join nKey nVal left lt, gt )
-
-                EQ ->
-                    ( turnBlack left, right )
+                ( ( rKey, rVal ) :: result, rRest ) |> unionAccumulator lKey lVal
 
 
 {-| Keep a key-value pair when its key appears in the second dictionary.
 Preference is given to values in the first dictionary.
 -}
 intersect : Dict comparable v -> Dict comparable v -> Dict comparable v
-intersect t1 t2 =
-    case ( t1, t2 ) of
-        ( Leaf, _ ) ->
-            Leaf
+intersect lDict rDict =
+    foldl intersectAccumulator ( [], toList rDict ) lDict |> Tuple.first |> fromSortedList False
 
-        ( _, Leaf ) ->
-            Leaf
 
-        ( Node _ _ key value left right, _ ) ->
-            let
-                ( lt, gt ) =
-                    splitBy key t2
-            in
-                if member key t2 then
-                    join key value (intersect lt left) (intersect gt right)
-                else
-                    union (intersect lt left) (intersect gt right)
+intersectAccumulator : comparable -> v -> ( List ( comparable, v ), List ( comparable, v ) ) -> ( List ( comparable, v ), List ( comparable, v ) )
+intersectAccumulator lKey lVal (( result, rList ) as return) =
+    case rList of
+        [] ->
+            return
+
+        ( rKey, rVal ) :: rRest ->
+            if lKey == rKey then
+                ( ( lKey, lVal ) :: result, rRest )
+            else if lKey < rKey then
+                return
+            else
+                ( result, rRest ) |> intersectAccumulator lKey lVal
 
 
 {-| Keep a key-value pair when its key does not appear in the second dictionary.
 -}
 diff : Dict comparable v -> Dict comparable v -> Dict comparable v
-diff t1 t2 =
-    case ( t1, t2 ) of
-        ( Leaf, _ ) ->
-            Leaf
+diff lDict rDict =
+    foldl diffAccumulator ( [], toList rDict ) lDict |> Tuple.first |> fromSortedList False
 
-        ( _, Leaf ) ->
-            t1
 
-        ( _, Node _ _ key value left right ) ->
-            let
-                ( lt, gt ) =
-                    splitBy key t1
-            in
-                union (diff lt left) (diff gt right)
+diffAccumulator : comparable -> v -> ( List ( comparable, v ), List ( comparable, v ) ) -> ( List ( comparable, v ), List ( comparable, v ) )
+diffAccumulator lKey lVal ( result, rList ) =
+    case rList of
+        [] ->
+            ( ( lKey, lVal ) :: result, [] )
+
+        ( rKey, rVal ) :: rRest ->
+            if lKey == rKey then
+                ( result, rRest )
+            else if lKey < rKey then
+                ( ( lKey, lVal ) :: result, rList )
+            else
+                ( result, rRest ) |> diffAccumulator lKey lVal
 
 
 {-| The most general way of combining two dictionaries. You provide three
