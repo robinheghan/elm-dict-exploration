@@ -541,8 +541,16 @@ partition predicate dict =
 to the first dictionary.
 -}
 union : Dict comparable v -> Dict comparable v -> Dict comparable v
-union lDict rDict =
-    foldl unionAccumulator ( [], toList rDict ) lDict |> uncurry (List.foldl (::)) |> fromSortedList False
+union left right =
+    case ( left, right ) of
+        ( _, Leaf ) ->
+            left
+
+        ( Leaf, _ ) ->
+            right
+
+        _ ->
+            foldl unionAccumulator ( [], toList right ) left |> uncurry (List.foldl (::)) |> fromSortedList False
 
 
 unionAccumulator : comparable -> v -> ( List ( comparable, v ), List ( comparable, v ) ) -> ( List ( comparable, v ), List ( comparable, v ) )
@@ -564,8 +572,20 @@ unionAccumulator lKey lVal ( result, rList ) =
 Preference is given to values in the first dictionary.
 -}
 intersect : Dict comparable v -> Dict comparable v -> Dict comparable v
-intersect lDict rDict =
-    foldl intersectAccumulator ( [], toList rDict ) lDict |> Tuple.first |> fromSortedList False
+intersect left right =
+    case ( getRange left, getRange right ) of
+        ( _, Nothing ) ->
+            empty
+
+        ( Nothing, _ ) ->
+            empty
+
+        ( Just ( lMin, lMax ), Just ( rMin, rMax ) ) ->
+            if lMax < rMin || rMax < lMin then
+                -- disjoint ranges
+                empty
+            else
+                foldl intersectAccumulator ( [], toList right ) left |> Tuple.first |> fromSortedList False
 
 
 intersectAccumulator : comparable -> v -> ( List ( comparable, v ), List ( comparable, v ) ) -> ( List ( comparable, v ), List ( comparable, v ) )
@@ -586,8 +606,20 @@ intersectAccumulator lKey lVal (( result, rList ) as return) =
 {-| Keep a key-value pair when its key does not appear in the second dictionary.
 -}
 diff : Dict comparable v -> Dict comparable v -> Dict comparable v
-diff lDict rDict =
-    foldl diffAccumulator ( [], toList rDict ) lDict |> Tuple.first |> fromSortedList False
+diff left right =
+    case ( getRange left, getRange right ) of
+        ( _, Nothing ) ->
+            left
+
+        ( Nothing, _ ) ->
+            empty
+
+        ( Just ( lMin, lMax ), Just ( rMin, rMax ) ) ->
+            if lMax < rMin || rMax < lMin then
+                -- disjoint ranges
+                left
+            else
+                foldl diffAccumulator ( [], toList right ) left |> Tuple.first |> fromSortedList False
 
 
 diffAccumulator : comparable -> v -> ( List ( comparable, v ), List ( comparable, v ) ) -> ( List ( comparable, v ), List ( comparable, v ) )
@@ -603,6 +635,36 @@ diffAccumulator lKey lVal ( result, rList ) =
                 ( ( lKey, lVal ) :: result, rList )
             else
                 ( result, rRest ) |> diffAccumulator lKey lVal
+
+
+getRange : Dict comparable v -> Maybe ( comparable, comparable )
+getRange dict =
+    case dict of
+        Leaf ->
+            Nothing
+
+        Node _ _ key _ left right ->
+            Just ( getMinKeyHelp key left, getMaxKeyHelp key right )
+
+
+getMinKeyHelp : comparable -> Dict comparable v -> comparable
+getMinKeyHelp minKey dict =
+    case dict of
+        Leaf ->
+            minKey
+
+        Node _ _ newMinKey _ left _ ->
+            getMinKeyHelp newMinKey left
+
+
+getMaxKeyHelp : comparable -> Dict comparable v -> comparable
+getMaxKeyHelp maxKey dict =
+    case dict of
+        Leaf ->
+            maxKey
+
+        Node _ _ newMaxKey _ _ right ->
+            getMaxKeyHelp newMaxKey right
 
 
 {-| The most general way of combining two dictionaries. You provide three

@@ -1,7 +1,7 @@
 module Main exposing (main)
 
 import Benchmark.Runner exposing (BenchmarkProgram, program)
-import Benchmark exposing (Benchmark, describe, benchmark1, benchmark2, benchmark3, benchmark4)
+import Benchmark exposing (Benchmark, describe, benchmark, benchmark1, benchmark2, benchmark3, benchmark4)
 import Dict
 import Dict.LLRB as Dict2
 
@@ -21,8 +21,10 @@ suite n =
         [ suiteBuild n
         , suiteQuery n
         , suiteModify n
-        , suiteCombineContiguous n
         , suiteCombineFragmented n
+        , suiteCombineContiguous n
+        , suiteCombineDisjoint n
+        , suiteCombineEmpty n
         , suiteTransform n
         ]
 
@@ -30,7 +32,7 @@ suite n =
 suiteBuild : Int -> Benchmark
 suiteBuild n =
     let
-        -- mix up list
+        -- build from an unsorted list
         q =
             n // 4
 
@@ -107,55 +109,55 @@ suiteModify n =
             ]
 
 
-suiteCombineContiguous : Int -> Benchmark
-suiteCombineContiguous n =
-    let
-        ( list, shiftedList ) =
-            ( assocListRange 1 n, assocListRange (n // 2 + 1) (n // 2 + n) )
-
-        ( left, right ) =
-            ( Dict.fromList list, Dict.fromList shiftedList )
-
-        ( left2, right2 ) =
-            ( Dict2.fromList list, Dict2.fromList shiftedList )
-    in
-        describe "Combine (contiguous intersection)"
-            [ Benchmark.compare "union"
-                (benchmark2 dictName Dict.union left right)
-                (benchmark2 dict2Name Dict2.union left2 right2)
-            , Benchmark.compare "intersect"
-                (benchmark2 dictName Dict.intersect left right)
-                (benchmark2 dict2Name Dict2.intersect left2 right2)
-            , Benchmark.compare "diff"
-                (benchmark2 dictName Dict.diff left right)
-                (benchmark2 dict2Name Dict2.diff left2 right2)
-            ]
-
-
 suiteCombineFragmented : Int -> Benchmark
 suiteCombineFragmented n =
-    let
-        ( multiples2, multiples3 ) =
-            ( assocListRange 1 (2 * n) |> List.filter (\( k, _ ) -> k % 2 == 0)
-            , assocListRange 1 (3 * n) |> List.filter (\( k, _ ) -> k % 3 == 0)
-            )
+    suiteCombine "Combine (fragmented intersections)"
+        -- multiples of 2
+        (assocListRange 1 (2 * n) |> List.filter (\( k, _ ) -> k % 2 == 0))
+        -- multiples of 3
+        (assocListRange 1 (3 * n) |> List.filter (\( k, _ ) -> k % 3 == 0))
 
+
+suiteCombineContiguous : Int -> Benchmark
+suiteCombineContiguous n =
+    suiteCombine "Combine (contiguous intersection)"
+        (assocListRange 1 n)
+        (assocListRange (n // 2 + 1) (n // 2 + n))
+
+
+suiteCombineDisjoint : Int -> Benchmark
+suiteCombineDisjoint n =
+    suiteCombine "Combine (disjoint ranges)"
+        (assocListRange 1 n)
+        (assocListRange (n + 1) (n + n))
+
+
+suiteCombineEmpty : Int -> Benchmark
+suiteCombineEmpty n =
+    suiteCombine "Combine (with one empty)"
+        (assocListRange 1 n)
+        []
+
+
+suiteCombine : String -> List ( comparable, v ) -> List ( comparable, v ) -> Benchmark
+suiteCombine description leftList rightList =
+    let
         ( left, right ) =
-            ( Dict.fromList multiples2, Dict.fromList multiples3 )
+            ( Dict.fromList leftList, Dict.fromList rightList )
 
         ( left2, right2 ) =
-            ( Dict2.fromList multiples2, Dict2.fromList multiples3 )
+            ( Dict2.fromList leftList, Dict2.fromList rightList )
     in
-        describe "Combine (fragmented intersection)"
+        describe description
             [ Benchmark.compare "union"
-                (benchmark2 dictName Dict.union left right)
-                (benchmark2 dict2Name Dict2.union left2 right2)
+                (benchmark2Commutative dictName Dict.union left right)
+                (benchmark2Commutative dict2Name Dict2.union left2 right2)
             , Benchmark.compare "intersect"
-                (benchmark2 dictName Dict.intersect left right)
-                (benchmark2 dict2Name Dict2.intersect left2 right2)
+                (benchmark2Commutative dictName Dict.intersect left right)
+                (benchmark2Commutative dict2Name Dict2.intersect left2 right2)
             , Benchmark.compare "diff"
-                (benchmark2 dictName Dict.diff left right)
-                (benchmark2 dict2Name Dict2.diff left2 right2)
+                (benchmark2Commutative dictName Dict.diff left right)
+                (benchmark2Commutative dict2Name Dict2.diff left2 right2)
             ]
 
 
@@ -181,3 +183,8 @@ suiteTransform n =
 assocListRange : Int -> Int -> List ( Int, Int )
 assocListRange start end =
     List.range start end |> List.map (\x -> ( x, x ))
+
+
+benchmark2Commutative : String -> (a -> a -> b) -> a -> a -> Benchmark
+benchmark2Commutative name op left right =
+    benchmark name (\() -> ( op left right, op right left ))
