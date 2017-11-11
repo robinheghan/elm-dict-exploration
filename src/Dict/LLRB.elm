@@ -745,8 +745,8 @@ fromList =
 removeRepeats : List ( comparable, v ) -> List ( comparable, v )
 removeRepeats list =
     case list of
-        x :: list ->
-            removeRepeatsHelp [] x list
+        pair :: rest ->
+            removeRepeatsHelp [] pair rest
 
         [] ->
             []
@@ -773,8 +773,8 @@ fromSortedList isAsc list =
         [] ->
             Leaf
 
-        x :: rest ->
-            sortedListToNodeList isAsc [] x rest |> fromNodeList 2 isAsc
+        pair :: rest ->
+            sortedListToNodeList isAsc [] pair rest |> fromNodeList 2 isAsc
 
 
 {-| Represents a non-empty list of nodes separated by key-value pairs.
@@ -787,25 +787,25 @@ type alias NodeList k v =
 by key-value pairs. (reverses order)
 -}
 sortedListToNodeList : Bool -> List ( ( k, v ), Dict k v ) -> ( k, v ) -> List ( k, v ) -> NodeList k v
-sortedListToNodeList isAsc revList a list =
+sortedListToNodeList isAsc revList p1 list =
     case list of
         [] ->
-            ( node2 1 Leaf a Leaf, revList )
+            ( node2 1 Leaf p1 Leaf, revList )
 
-        b :: [] ->
+        p2 :: [] ->
             if isAsc then
-                ( node3 1 Leaf a Leaf b Leaf, revList )
+                ( node3 1 Leaf p1 Leaf p2 Leaf, revList )
             else
-                ( node3 1 Leaf b Leaf a Leaf, revList )
+                ( node3 1 Leaf p2 Leaf p1 Leaf, revList )
 
-        b :: c :: [] ->
-            ( node2 1 Leaf c Leaf, ( b, node2 1 Leaf a Leaf ) :: revList )
+        p2 :: p3 :: [] ->
+            ( node2 1 Leaf p3 Leaf, ( p2, node2 1 Leaf p1 Leaf ) :: revList )
 
-        b :: c :: d :: rest ->
+        p2 :: p3 :: p4 :: rest ->
             if isAsc then
-                sortedListToNodeList isAsc (( c, node3 1 Leaf a Leaf b Leaf ) :: revList) d rest
+                sortedListToNodeList isAsc (( p3, node3 1 Leaf p1 Leaf p2 Leaf ) :: revList) p4 rest
             else
-                sortedListToNodeList isAsc (( c, node3 1 Leaf b Leaf a Leaf ) :: revList) d rest
+                sortedListToNodeList isAsc (( p3, node3 1 Leaf p2 Leaf p1 Leaf ) :: revList) p4 rest
 
 
 {-| Gather up a NodeList one level at a time, in successive passes of alternating
