@@ -2,7 +2,7 @@ module Main exposing (main)
 
 import Benchmark.Runner exposing (BenchmarkProgram, program)
 import Benchmark exposing (Benchmark, describe, benchmark1, benchmark2, benchmark3, benchmark4)
-import Dict
+import Dict as Dict
 import Dict.LLRB as Dict2
 
 
@@ -17,11 +17,14 @@ suite n =
         half =
             n // 2
 
+        quarter =
+            half // 2
+
         ls =
             List.map3
                 (\a b c -> [ a, b, c ])
                 (List.map toKeyValuePair (List.range 0 half))
-                (List.map toKeyValuePair (List.range (half // 2) ((half // 2) + half) |> List.reverse))
+                (List.map toKeyValuePair (List.range quarter (half + quarter) |> List.reverse))
                 (List.map toKeyValuePair (List.range (half + 1) n))
                 |> List.concat
 
@@ -29,7 +32,7 @@ suite n =
             ( n, n )
 
         setLs =
-            List.map toKeyValuePair (List.range (half + (half // 2)) (n + half))
+            List.map toKeyValuePair (List.range half (n + half))
 
         original =
             Dict.fromList ls
