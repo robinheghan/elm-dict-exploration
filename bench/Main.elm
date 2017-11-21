@@ -20,13 +20,16 @@ suite n =
         ls =
             List.map3
                 (\a b c -> [ a, b, c ])
-                (List.indexedMap (,) (List.range 0 half))
-                (List.indexedMap (,) (List.range (half // 2) ((half // 2) + half) |> List.reverse))
-                (List.indexedMap (,) (List.range (half + 1) n))
+                (List.map toKeyValuePair (List.range 0 half))
+                (List.map toKeyValuePair (List.range (half // 2) ((half // 2) + half) |> List.reverse))
+                (List.map toKeyValuePair (List.range (half + 1) n))
                 |> List.concat
 
+        toKeyValuePair n =
+            ( n, n )
+
         setLs =
-            List.indexedMap (,) (List.range (half + (half // 2)) (n + half))
+            List.map toKeyValuePair (List.range (half + (half // 2)) (n + half))
 
         original =
             Dict.fromList ls
