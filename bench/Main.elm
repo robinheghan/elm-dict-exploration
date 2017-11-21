@@ -14,19 +14,19 @@ main =
 suite : Int -> Benchmark
 suite n =
     let
-        halfwayPoint =
+        half =
             n // 2
 
         ls =
             List.map3
                 (\a b c -> [ a, b, c ])
-                (List.indexedMap (,) (List.range 0 50))
-                (List.indexedMap (,) (List.range 25 75 |> List.reverse))
-                (List.indexedMap (,) (List.range 51 100))
+                (List.indexedMap (,) (List.range 0 half))
+                (List.indexedMap (,) (List.range (half // 2) ((half // 2) + half) |> List.reverse))
+                (List.indexedMap (,) (List.range (half + 1) n))
                 |> List.concat
 
         setLs =
-            List.indexedMap (,) (List.range 75 175)
+            List.indexedMap (,) (List.range (half + (half // 2)) (n + half))
 
         original =
             Dict.fromList ls
