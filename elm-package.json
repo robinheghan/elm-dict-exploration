@@ -1,5 +1,5 @@
 {
-    "version": "1.0.2",
+    "version": "1.0.3",
     "summary": "Exploring the dict implementation",
     "repository": "https://github.com/Skinney/elm-dict-exploration.git",
     "license": "BSD3",
