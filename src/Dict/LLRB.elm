@@ -527,17 +527,17 @@ union : Dict comparable v -> Dict comparable v -> Dict comparable v
 union t1 t2 =
     case ( t1, t2 ) of
         ( _, Leaf ) ->
-            t1
+            turnBlack t1
 
         ( Leaf, _ ) ->
-            turnBlack t2
+            t2
 
         ( Node _ _ key value left right, _ ) ->
             let
                 ( lt, gt ) =
                     splitBy key t2
             in
-                join key value (union lt left) (union gt right)
+                join key value (union left lt) (union right gt)
 
 
 turnBlack : Dict comparable v -> Dict comparable v
@@ -635,15 +635,15 @@ intersect t1 t2 =
         ( _, Leaf ) ->
             Leaf
 
-        ( _, Node _ _ key value left right ) ->
+        ( Node _ _ key value left right, _ ) ->
             let
                 ( lt, gt ) =
-                    splitBy key t1
+                    splitBy key t2
             in
-                if member key t1 then
-                    join key value (intersect lt left) (intersect gt right)
+                if member key t2 then
+                    join key value (intersect left lt) (intersect right gt)
                 else
-                    union (intersect lt left) (intersect gt right)
+                    union (intersect left lt) (intersect right gt)
 
 
 {-| Keep a key-value pair when its key does not appear in the second dictionary.
