@@ -32,11 +32,10 @@ suite n =
 suiteBuild : Int -> Benchmark
 suiteBuild n =
     let
-        -- build from an unsorted list
         q =
             n // 4
 
-        assocList =
+        assocListUnsorted =
             List.map4
                 (\a b c d -> [ a, b, c, d ])
                 (assocListRange 1 q)
@@ -44,14 +43,32 @@ suiteBuild n =
                 (assocListRange (2 * q + 1) (3 * q))
                 (assocListRange (3 * q + 1) n |> List.reverse)
                 |> List.concat
+
+        assocListSorted =
+            assocListRange 1 n
+
+        assocListHalfSorted =
+            assocListRange (q + 1) (3 * q) ++ assocListRange 1 q ++ assocListRange (3 * q + 1) n
+
+        assocListAlmostSorted =
+            assocListRange 1 (n - 1) ++ [ ( n - 1, 0 ) ]
     in
         describe "Build"
-            [ Benchmark.compare "fromList"
-                (benchmark1 dictName Dict.fromList assocList)
-                (benchmark1 dict2Name Dict2.fromList assocList)
+            [ Benchmark.compare "fromList (unsorted)"
+                (benchmark1 dictName Dict.fromList assocListUnsorted)
+                (benchmark1 dict2Name Dict2.fromList assocListUnsorted)
+            , Benchmark.compare "fromList (sorted)"
+                (benchmark1 dictName Dict.fromList assocListSorted)
+                (benchmark1 dict2Name Dict2.fromList assocListSorted)
+            , Benchmark.compare "fromList (half sorted)"
+                (benchmark1 dictName Dict.fromList assocListHalfSorted)
+                (benchmark1 dict2Name Dict2.fromList assocListHalfSorted)
+            , Benchmark.compare "fromList (almost sorted)"
+                (benchmark1 dictName Dict.fromList assocListAlmostSorted)
+                (benchmark1 dict2Name Dict2.fromList assocListAlmostSorted)
             , Benchmark.compare "insert (from empty)"
-                (benchmark3 dictName List.foldl (uncurry Dict.insert) Dict.empty assocList)
-                (benchmark3 dict2Name List.foldl (uncurry Dict2.insert) Dict2.empty assocList)
+                (benchmark3 dictName List.foldl (uncurry Dict.insert) Dict.empty assocListUnsorted)
+                (benchmark3 dict2Name List.foldl (uncurry Dict2.insert) Dict2.empty assocListUnsorted)
             ]
 
 

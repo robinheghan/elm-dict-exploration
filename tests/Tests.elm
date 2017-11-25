@@ -22,7 +22,7 @@ pairRange =
 
 fuzzPairs : Fuzzer (List ( Int, Int ))
 fuzzPairs =
-    ( pairRange, Fuzz.constant 0 )
+    ( pairRange, pairRange )
         |> Fuzz.tuple
         |> Fuzz.list
 

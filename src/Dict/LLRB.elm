@@ -736,33 +736,36 @@ toList dict =
 {-| Convert an association list into a dictionary.
 -}
 fromList : List ( comparable, v ) -> Dict comparable v
-fromList =
-    List.sortBy Tuple.first >> removeRepeats >> fromSortedList False
-
-
-{-| Remove consecutive duplicates, where last duplicate wins. (reverses order)
--}
-removeRepeats : List ( comparable, v ) -> List ( comparable, v )
-removeRepeats list =
+fromList list =
     case list of
         pair :: rest ->
-            removeRepeatsHelp [] pair rest
+            let
+                ( sorted, remainder ) =
+                    splitSortedHelp [] pair rest
+            in
+                List.foldl
+                    (\( k, v ) dict -> insert k v dict)
+                    (sorted |> fromSortedList False)
+                    remainder
 
         [] ->
-            []
+            empty
 
 
-removeRepeatsHelp : List ( comparable, v ) -> ( comparable, v ) -> List ( comparable, v ) -> List ( comparable, v )
-removeRepeatsHelp revList (( key, _ ) as pair) list =
+{-| Split a list into its sorted prefix and the remainder. The sorted prefix
+is returned in reversed order.
+-}
+splitSortedHelp : List ( comparable, v ) -> ( comparable, v ) -> List ( comparable, v ) -> ( List ( comparable, v ), List ( comparable, v ) )
+splitSortedHelp sorted (( k1, _ ) as p1) list =
     case list of
-        (( nextKey, _ ) as nextPair) :: rest ->
-            if key == nextKey then
-                removeRepeatsHelp (revList) nextPair rest
+        (( k2, _ ) as p2) :: rest ->
+            if k1 < k2 then
+                splitSortedHelp (p1 :: sorted) p2 rest
             else
-                removeRepeatsHelp (pair :: revList) nextPair rest
+                ( sorted, p1 :: list )
 
         [] ->
-            pair :: revList
+            ( p1 :: sorted, [] )
 
 
 {-| Convert an association list with sorted and distinct keys into a dictionary.
