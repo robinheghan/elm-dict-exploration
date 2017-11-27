@@ -88,7 +88,7 @@ that lets you look up a `String` (such as user names) and find the associated
 -}
 type Dict key value
     = Leaf
-    | Node Color Int key value (Dict key value) (Dict key value)
+    | Node Color key value (Dict key value) (Dict key value)
 
 
 {-| The color of a Node. Leafs are considered black.
@@ -118,7 +118,7 @@ isEmpty dict =
 singleton : comparable -> v -> Dict comparable v
 singleton key value =
     -- Root is always black
-    Node Black 1 key value Leaf Leaf
+    Node Black key value Leaf Leaf
 
 
 {-| Determine the number of key-value pairs in the dictionary.
@@ -134,7 +134,7 @@ sizeHelp n dict =
         Leaf ->
             n
 
-        Node _ _ _ _ left right ->
+        Node _ _ _ left right ->
             sizeHelp (sizeHelp (n + 1) right) left
 
 
@@ -154,7 +154,7 @@ get targetKey dict =
         Leaf ->
             Nothing
 
-        Node _ _ key value left right ->
+        Node _ key value left right ->
             case compare targetKey key of
                 LT ->
                     get targetKey left
@@ -192,50 +192,48 @@ insertHelp key value dict =
         Leaf ->
             -- New nodes are always red. If it violates the rules, it will be fixed
             -- when balancing.
-            Node Red 1 key value Leaf Leaf
+            Node Red key value Leaf Leaf
 
-        Node nColor nHeight nKey nValue nLeft nRight ->
+        Node nColor nKey nValue nLeft nRight ->
             case compare key nKey of
                 LT ->
-                    balance nColor nHeight nKey nValue (insertHelp key value nLeft) nRight
+                    balance nColor nKey nValue (insertHelp key value nLeft) nRight
 
                 GT ->
-                    balance nColor nHeight nKey nValue nLeft (insertHelp key value nRight)
+                    balance nColor nKey nValue nLeft (insertHelp key value nRight)
 
                 EQ ->
-                    Node nColor nHeight nKey value nLeft nRight
+                    Node nColor nKey value nLeft nRight
 
 
-balance : Color -> Int -> k -> v -> Dict k v -> Dict k v -> Dict k v
-balance color h key value left right =
+balance : Color -> k -> v -> Dict k v -> Dict k v -> Dict k v
+balance color key value left right =
     case right of
-        Node Red rH rK rV rLeft rRight ->
+        Node Red rK rV rLeft rRight ->
             case left of
-                Node Red lH lK lV lLeft lRight ->
+                Node Red lK lV lLeft lRight ->
                     Node
                         Red
-                        (h + 1)
                         key
                         value
-                        (Node Black lH lK lV lLeft lRight)
-                        (Node Black rH rK rV rLeft rRight)
+                        (Node Black lK lV lLeft lRight)
+                        (Node Black rK rV rLeft rRight)
 
                 _ ->
-                    Node color h rK rV (Node Red rH key value left rLeft) rRight
+                    Node color rK rV (Node Red key value left rLeft) rRight
 
         _ ->
             case left of
-                Node Red lH lK lV (Node Red llH llK llV llLeft llRight) lRight ->
+                Node Red lK lV (Node Red llK llV llLeft llRight) lRight ->
                     Node
                         Red
-                        (h + 1)
                         lK
                         lV
-                        (Node Black llH llK llV llLeft llRight)
-                        (Node Black h key value lRight right)
+                        (Node Black llK llV llLeft llRight)
+                        (Node Black key value lRight right)
 
                 _ ->
-                    Node color h key value left right
+                    Node color key value left right
 
 
 {-| Remove a key-value pair from a dictionary. If the key is not found,
@@ -258,46 +256,45 @@ removeHelp targetKey dict =
         Leaf ->
             Leaf
 
-        Node color height key value left right ->
+        Node color key value left right ->
             if targetKey < key then
                 case left of
-                    Node Black _ _ _ lLeft _ ->
+                    Node Black _ _ lLeft _ ->
                         case lLeft of
-                            Node Red _ _ _ _ _ ->
-                                Node color height key value (removeHelp targetKey left) right
+                            Node Red _ _ _ _ ->
+                                Node color key value (removeHelp targetKey left) right
 
                             _ ->
                                 case moveRedLeft dict of
-                                    Node color height key value left right ->
-                                        balance color height key value (removeHelp targetKey left) right
+                                    Node color key value left right ->
+                                        balance color key value (removeHelp targetKey left) right
 
                                     Leaf ->
                                         Leaf
 
                     _ ->
-                        Node color height key value (removeHelp targetKey left) right
+                        Node color key value (removeHelp targetKey left) right
             else
-                removeHelpEQGT targetKey (removeHelpPrepEQGT targetKey dict color height key value left right)
+                removeHelpEQGT targetKey (removeHelpPrepEQGT targetKey dict color key value left right)
 
 
-removeHelpPrepEQGT : comparable -> Dict comparable v -> Color -> Int -> comparable -> v -> Dict comparable v -> Dict comparable v -> Dict comparable v
-removeHelpPrepEQGT targetKey dict color height key value left right =
+removeHelpPrepEQGT : comparable -> Dict comparable v -> Color -> comparable -> v -> Dict comparable v -> Dict comparable v -> Dict comparable v
+removeHelpPrepEQGT targetKey dict color key value left right =
     case left of
-        Node Red lH lK lV lLeft lRight ->
+        Node Red lK lV lLeft lRight ->
             Node
                 color
-                height
                 lK
                 lV
                 lLeft
-                (Node Red (height - 1) key value lRight right)
+                (Node Red key value lRight right)
 
         _ ->
             case right of
-                Node Black _ _ _ (Node Black _ _ _ _ _) _ ->
+                Node Black _ _ (Node Black _ _ _ _) _ ->
                     moveRedRight dict
 
-                Node Black _ _ _ Leaf _ ->
+                Node Black _ _ Leaf _ ->
                     moveRedRight dict
 
                 _ ->
@@ -310,16 +307,16 @@ pair with the key-value pair of the left-most node on the right side (the closes
 removeHelpEQGT : comparable -> Dict comparable v -> Dict comparable v
 removeHelpEQGT targetKey dict =
     case dict of
-        Node color height key value left right ->
+        Node color key value left right ->
             if targetKey == key then
                 case getMin right of
-                    Node _ _ minKey minValue _ _ ->
-                        balance color height minKey minValue left (removeMin right)
+                    Node _ minKey minValue _ _ ->
+                        balance color minKey minValue left (removeMin right)
 
                     Leaf ->
                         Leaf
             else
-                balance color height key value left (removeHelp targetKey right)
+                balance color key value left (removeHelp targetKey right)
 
         Leaf ->
             Leaf
@@ -328,7 +325,7 @@ removeHelpEQGT targetKey dict =
 getMin : Dict k v -> Dict k v
 getMin dict =
     case dict of
-        Node _ _ _ _ ((Node _ _ _ _ _ _) as left) _ ->
+        Node _ _ _ ((Node _ _ _ _ _) as left) _ ->
             getMin left
 
         _ ->
@@ -338,23 +335,23 @@ getMin dict =
 removeMin : Dict k v -> Dict k v
 removeMin dict =
     case dict of
-        Node color height key value ((Node lColor _ _ _ lLeft _) as left) right ->
+        Node color key value ((Node lColor _ _ lLeft _) as left) right ->
             case lColor of
                 Black ->
                     case lLeft of
-                        Node Red _ _ _ _ _ ->
-                            Node color height key value (removeMin left) right
+                        Node Red _ _ _ _ ->
+                            Node color key value (removeMin left) right
 
                         _ ->
                             case moveRedLeft dict of
-                                Node color height key value left right ->
-                                    balance color height key value (removeMin left) right
+                                Node color key value left right ->
+                                    balance color key value (removeMin left) right
 
                                 Leaf ->
                                     Leaf
 
                 _ ->
-                    Node color height key value (removeMin left) right
+                    Node color key value (removeMin left) right
 
         _ ->
             Leaf
@@ -363,34 +360,31 @@ removeMin dict =
 moveRedLeft : Dict k v -> Dict k v
 moveRedLeft dict =
     case dict of
-        Node clr h k v (Node lClr lH lK lV lLeft lRight) (Node rClr rH rK rV ((Node Red rlH rlK rlV rlL rlR) as rLeft) rRight) ->
+        Node clr k v (Node lClr lK lV lLeft lRight) (Node rClr rK rV ((Node Red rlK rlV rlL rlR) as rLeft) rRight) ->
             Node
                 Red
-                h
                 rlK
                 rlV
-                (Node Black lH k v (Node Red rlH lK lV lLeft lRight) rlL)
-                (Node Black rH rK rV rlR rRight)
+                (Node Black k v (Node Red lK lV lLeft lRight) rlL)
+                (Node Black rK rV rlR rRight)
 
-        Node clr h k v (Node lClr lH lK lV lLeft lRight) (Node rClr rH rK rV rLeft rRight) ->
+        Node clr k v (Node lClr lK lV lLeft lRight) (Node rClr rK rV rLeft rRight) ->
             case clr of
                 Black ->
                     Node
                         Black
-                        (h - 1)
                         k
                         v
-                        (Node Red (lH - 1) lK lV lLeft lRight)
-                        (Node Red (rH - 1) rK rV rLeft rRight)
+                        (Node Red lK lV lLeft lRight)
+                        (Node Red rK rV rLeft rRight)
 
                 Red ->
                     Node
                         Black
-                        h
                         k
                         v
-                        (Node Red (lH - 1) lK lV lLeft lRight)
-                        (Node Red (rH - 1) rK rV rLeft rRight)
+                        (Node Red lK lV lLeft lRight)
+                        (Node Red rK rV rLeft rRight)
 
         _ ->
             dict
@@ -399,34 +393,31 @@ moveRedLeft dict =
 moveRedRight : Dict k v -> Dict k v
 moveRedRight dict =
     case dict of
-        Node clr h k v (Node lClr lH lK lV (Node Red llH llK llV llLeft llRight) lRight) (Node rClr rH rK rV rLeft rRight) ->
+        Node clr k v (Node lClr lK lV (Node Red llK llV llLeft llRight) lRight) (Node rClr rK rV rLeft rRight) ->
             Node
                 Red
-                h
                 lK
                 lV
-                (Node Black lH llK llV llLeft llRight)
-                (Node Black rH k v lRight (Node Red llH rK rV rLeft rRight))
+                (Node Black llK llV llLeft llRight)
+                (Node Black k v lRight (Node Red rK rV rLeft rRight))
 
-        Node clr h k v (Node lClr lH lK lV lLeft lRight) (Node rClr rH rK rV rLeft rRight) ->
+        Node clr k v (Node lClr lK lV lLeft lRight) (Node rClr rK rV rLeft rRight) ->
             case clr of
                 Black ->
                     Node
                         Black
-                        (h - 1)
                         k
                         v
-                        (Node Red (lH - 1) lK lV lLeft lRight)
-                        (Node Red (rH - 1) rK rV rLeft rRight)
+                        (Node Red lK lV lLeft lRight)
+                        (Node Red rK rV rLeft rRight)
 
                 Red ->
                     Node
                         Black
-                        h
                         k
                         v
-                        (Node Red (lH - 1) lK lV lLeft lRight)
-                        (Node Red (rH - 1) rK rV rLeft rRight)
+                        (Node Red lK lV lLeft lRight)
+                        (Node Red rK rV rLeft rRight)
 
         _ ->
             dict
@@ -435,8 +426,8 @@ moveRedRight dict =
 turnBlack : Dict comparable v -> Dict comparable v
 turnBlack dict =
     case dict of
-        Node Red h k v l r ->
-            Node Black h k v l r
+        Node Red k v l r ->
+            Node Black k v l r
 
         x ->
             x
@@ -466,8 +457,8 @@ map f dict =
         Leaf ->
             Leaf
 
-        Node color height key value left right ->
-            Node color height key (f key value) (map f left) (map f right)
+        Node color key value left right ->
+            Node color key (f key value) (map f left) (map f right)
 
 
 {-| Keep a key-value pair when it satisfies a predicate.
@@ -495,7 +486,7 @@ foldl f acc dict =
         Leaf ->
             acc
 
-        Node _ _ key value left right ->
+        Node _ key value left right ->
             foldl f (f key value (foldl f acc left)) right
 
 
@@ -508,7 +499,7 @@ foldr f acc dict =
         Leaf ->
             acc
 
-        Node _ _ key value left right ->
+        Node _ key value left right ->
             foldr f (f key value (foldr f acc right)) left
 
 
@@ -643,7 +634,7 @@ getRange dict =
         Leaf ->
             Nothing
 
-        Node _ _ key _ left right ->
+        Node _ key _ left right ->
             Just ( getMinKeyHelp key left, getMaxKeyHelp key right )
 
 
@@ -653,7 +644,7 @@ getMinKeyHelp minKey dict =
         Leaf ->
             minKey
 
-        Node _ _ newMinKey _ left _ ->
+        Node _ newMinKey _ left _ ->
             getMinKeyHelp newMinKey left
 
 
@@ -663,7 +654,7 @@ getMaxKeyHelp maxKey dict =
         Leaf ->
             maxKey
 
-        Node _ _ newMaxKey _ _ right ->
+        Node _ newMaxKey _ _ right ->
             getMaxKeyHelp newMaxKey right
 
 
@@ -777,7 +768,7 @@ fromSortedList isAsc list =
             Leaf
 
         pair :: rest ->
-            sortedListToNodeList isAsc [] pair rest |> fromNodeList 2 isAsc
+            sortedListToNodeList isAsc [] pair rest |> fromNodeList isAsc
 
 
 {-| Represents a non-empty list of nodes separated by key-value pairs.
@@ -793,80 +784,80 @@ sortedListToNodeList : Bool -> List ( ( k, v ), Dict k v ) -> ( k, v ) -> List (
 sortedListToNodeList isAsc revList p1 list =
     case list of
         [] ->
-            ( node2 1 Leaf p1 Leaf, revList )
+            ( node2 Leaf p1 Leaf, revList )
 
         p2 :: [] ->
             if isAsc then
-                ( node3 1 Leaf p1 Leaf p2 Leaf, revList )
+                ( node3 Leaf p1 Leaf p2 Leaf, revList )
             else
-                ( node3 1 Leaf p2 Leaf p1 Leaf, revList )
+                ( node3 Leaf p2 Leaf p1 Leaf, revList )
 
         p2 :: p3 :: [] ->
-            ( node2 1 Leaf p3 Leaf, ( p2, node2 1 Leaf p1 Leaf ) :: revList )
+            ( node2 Leaf p3 Leaf, ( p2, node2 Leaf p1 Leaf ) :: revList )
 
         p2 :: p3 :: p4 :: rest ->
             if isAsc then
-                sortedListToNodeList isAsc (( p3, node3 1 Leaf p1 Leaf p2 Leaf ) :: revList) p4 rest
+                sortedListToNodeList isAsc (( p3, node3 Leaf p1 Leaf p2 Leaf ) :: revList) p4 rest
             else
-                sortedListToNodeList isAsc (( p3, node3 1 Leaf p2 Leaf p1 Leaf ) :: revList) p4 rest
+                sortedListToNodeList isAsc (( p3, node3 Leaf p2 Leaf p1 Leaf ) :: revList) p4 rest
 
 
 {-| Gather up a NodeList one level at a time, in successive passes of alternating
 direction, until a single root-node remains.
 -}
-fromNodeList : Int -> Bool -> NodeList k v -> Dict k v
-fromNodeList h isReversed nodeList =
+fromNodeList : Bool -> NodeList k v -> Dict k v
+fromNodeList isReversed nodeList =
     case nodeList of
         ( node, [] ) ->
             node
 
         ( a, ( p1, b ) :: list ) ->
-            accumulateNodeList h isReversed [] a p1 b list
-                |> fromNodeList (h + 1) (not isReversed)
+            accumulateNodeList isReversed [] a p1 b list
+                |> fromNodeList (not isReversed)
 
 
 {-| Gather up a NodeList to the next level. (reverses order)
 -}
-accumulateNodeList : Int -> Bool -> List ( ( k, v ), Dict k v ) -> Dict k v -> ( k, v ) -> Dict k v -> List ( ( k, v ), Dict k v ) -> NodeList k v
-accumulateNodeList h isReversed revList a p1 b list =
+accumulateNodeList : Bool -> List ( ( k, v ), Dict k v ) -> Dict k v -> ( k, v ) -> Dict k v -> List ( ( k, v ), Dict k v ) -> NodeList k v
+accumulateNodeList isReversed revList a p1 b list =
     case list of
         [] ->
             if isReversed then
-                ( node2 h b p1 a, revList )
+                ( node2 b p1 a, revList )
             else
-                ( node2 h a p1 b, revList )
+                ( node2 a p1 b, revList )
 
         ( p2, c ) :: [] ->
             if isReversed then
-                ( node3 h c p2 b p1 a, revList )
+                ( node3 c p2 b p1 a, revList )
             else
-                ( node3 h a p1 b p2 c, revList )
+                ( node3 a p1 b p2 c, revList )
 
         ( p2, c ) :: ( p3, d ) :: [] ->
             if isReversed then
-                ( node2 h d p3 c, ( p2, node2 h b p1 a ) :: revList )
+                ( node2 d p3 c, ( p2, node2 b p1 a ) :: revList )
             else
-                ( node2 h c p3 d, ( p2, node2 h a p1 b ) :: revList )
+                ( node2 c p3 d, ( p2, node2 a p1 b ) :: revList )
 
         ( p2, c ) :: ( p3, d ) :: ( p4, e ) :: rest ->
             if isReversed then
-                accumulateNodeList h isReversed (( p3, node3 h c p2 b p1 a ) :: revList) d p4 e rest
+                accumulateNodeList isReversed (( p3, node3 c p2 b p1 a ) :: revList) d p4 e rest
             else
-                accumulateNodeList h isReversed (( p3, node3 h a p1 b p2 c ) :: revList) d p4 e rest
+                accumulateNodeList isReversed (( p3, node3 a p1 b p2 c ) :: revList) d p4 e rest
 
 
 
 -- node constructors
 
 
-node2 : Int -> Dict k v -> ( k, v ) -> Dict k v -> Dict k v
-node2 h a ( k1, v1 ) b =
-    Node Black h k1 v1 a b
+node2 : Dict k v -> ( k, v ) -> Dict k v -> Dict k v
+node2 a ( k1, v1 ) b =
+    Node Black k1 v1 a b
 
 
-node3 : Int -> Dict k v -> ( k, v ) -> Dict k v -> ( k, v ) -> Dict k v -> Dict k v
-node3 h a ( k1, v1 ) b ( k2, v2 ) c =
-    Node Black h k2 v2 (Node Red h k1 v1 a b) c
+node3 : Dict k v -> ( k, v ) -> Dict k v -> ( k, v ) -> Dict k v -> Dict k v
+node3 a ( k1, v1 ) b ( k2, v2 ) c =
+    Node Black k2 v2 (Node Red k1 v1 a b) c
 
 
 
@@ -881,8 +872,6 @@ validateInvariants dict =
         "Not a 2-3 tree"
     else if not (isBalanced dict) then
         "Not balanced"
-    else if not (correctBlackHeight dict) then
-        "Black height tracking is off"
     else
         ""
 
@@ -916,7 +905,7 @@ is23Helper root node =
         Leaf ->
             True
 
-        Node clr _ _ _ left right ->
+        Node clr _ _ left right ->
             if isRed right then
                 False
             else if node /= root && clr == Red && isRed left then
@@ -928,7 +917,7 @@ is23Helper root node =
 isRed : Dict k v -> Bool
 isRed dict =
     case dict of
-        Node Red _ _ _ _ _ ->
+        Node Red _ _ _ _ ->
             True
 
         _ ->
@@ -946,7 +935,7 @@ isBalancedBlacksHelper node blacks =
         Leaf ->
             blacks
 
-        Node color _ _ _ left _ ->
+        Node color _ _ left _ ->
             if color == Red then
                 isBalancedBlacksHelper left blacks
             else
@@ -959,7 +948,7 @@ isBalancedHelper node blacks =
         Leaf ->
             blacks == 0
 
-        Node color _ _ _ left right ->
+        Node color _ _ left right ->
             let
                 nextBlacks =
                     if color == Red then
@@ -968,17 +957,3 @@ isBalancedHelper node blacks =
                         blacks - 1
             in
                 isBalancedHelper left nextBlacks && isBalancedHelper right nextBlacks
-
-
-correctBlackHeight : Dict k v -> Bool
-correctBlackHeight node =
-    case node of
-        Leaf ->
-            True
-
-        Node _ height _ _ left right ->
-            let
-                correct =
-                    isBalancedBlacksHelper node 0
-            in
-                height == correct
