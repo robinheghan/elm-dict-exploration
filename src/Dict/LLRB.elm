@@ -433,6 +433,9 @@ moveRedRight dict =
 
 
 {-| Update the value of a dictionary for a specific key with a given function.
+The given function gets the current value as a parameter and its return value
+determines if the value is updated or removed. New key-value pairs can be
+inserted too.
 -}
 update : comparable -> (Maybe v -> Maybe v) -> Dict comparable v -> Dict comparable v
 update key alter dict =
