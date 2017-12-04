@@ -45,6 +45,23 @@ tests =
                 , test "update Nothing" <| \() -> Expect.equal Dict.empty (Dict.update "k" (\v -> Nothing) (Dict.singleton "k" "v"))
                 , test "remove" <| \() -> Expect.equal Dict.empty (Dict.remove "k" (Dict.singleton "k" "v"))
                 , test "remove not found" <| \() -> Expect.equal (Dict.singleton "k" "v") (Dict.remove "kk" (Dict.singleton "k" "v"))
+                , test "fromList excludes duplicates" <| \() -> Expect.equal (Dict.singleton 1 1) (Dict.fromList [ ( 1, 1 ), ( 1, 1 ) ])
+                , describe "fromList builds a valid Dict"
+                    (List.range 1 100
+                        |> List.map
+                            (\n ->
+                                test ("of size " ++ toString n) <|
+                                    \() ->
+                                        let
+                                            list =
+                                                List.range 1 n |> List.indexedMap (,)
+
+                                            dict =
+                                                Dict.fromList list
+                                        in
+                                            Expect.equal ( "", list ) ( Dict.validateInvariants dict, Dict.toList dict )
+                            )
+                    )
                 ]
 
         queryTests =
@@ -62,13 +79,16 @@ tests =
                 [ test "union" <| \() -> Expect.equal animals (Dict.union (Dict.singleton "Jerry" "mouse") (Dict.singleton "Tom" "cat"))
                 , test "union collison" <| \() -> Expect.equal (Dict.singleton "Tom" "cat") (Dict.union (Dict.singleton "Tom" "cat") (Dict.singleton "Tom" "mouse"))
                 , test "intersect" <| \() -> Expect.equal (Dict.singleton "Tom" "cat") (Dict.intersect animals (Dict.singleton "Tom" "cat"))
+                , test "intersect collision" <| \() -> Expect.equal (Dict.singleton "Tom" "wolf") (Dict.intersect (Dict.singleton "Tom" "wolf") animals)
                 , test "diff" <| \() -> Expect.equal (Dict.singleton "Jerry" "mouse") (Dict.diff animals (Dict.singleton "Tom" "cat"))
                 ]
 
         transformTests =
             describe "transform Tests"
                 [ test "filter" <| \() -> Expect.equal (Dict.singleton "Tom" "cat") (Dict.filter (\k v -> k == "Tom") animals)
+                , test "filter (numbers)" <| \() -> Expect.equal [ 2, 4, 6, 8, 10 ] (List.range 1 10 |> List.indexedMap (,) |> Dict.fromList |> Dict.filter (\_ v -> v % 2 == 0) |> Dict.values)
                 , test "partition" <| \() -> Expect.equal ( Dict.singleton "Tom" "cat", Dict.singleton "Jerry" "mouse" ) (Dict.partition (\k v -> k == "Tom") animals)
+                , test "partition (numbers)" <| \() -> Expect.equal ( [ 2, 4, 6, 8, 10 ], [ 1, 3, 5, 7, 9 ] ) (List.range 1 10 |> List.indexedMap (,) |> Dict.fromList |> Dict.partition (\_ v -> v % 2 == 0) |> (\( a, b ) -> ( Dict.values a, Dict.values b )))
                 ]
 
         mergeTests =
