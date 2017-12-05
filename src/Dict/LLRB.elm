@@ -183,7 +183,12 @@ a collision.
 -}
 insert : comparable -> v -> Dict comparable v -> Dict comparable v
 insert key value dict =
-    turnBlack (insertHelp key value dict)
+    case insertHelp key value dict of
+        Node Red k v l r ->
+            Node Black k v l r
+
+        x ->
+            x
 
 
 insertHelp : comparable -> v -> Dict comparable v -> Dict comparable v
@@ -241,7 +246,12 @@ no changes are made.
 -}
 remove : comparable -> Dict comparable v -> Dict comparable v
 remove targetKey dict =
-    turnBlack (removeHelp targetKey dict)
+    case removeHelp targetKey dict of
+        Node Red k v l r ->
+            Node Black k v l r
+
+        x ->
+            x
 
 
 {-| The easiest thing to remove from the tree, is a red node. However, when searching for the
@@ -423,16 +433,6 @@ moveRedRight dict =
             dict
 
 
-turnBlack : Dict comparable v -> Dict comparable v
-turnBlack dict =
-    case dict of
-        Node Red k v l r ->
-            Node Black k v l r
-
-        x ->
-            x
-
-
 {-| Update the value of a dictionary for a specific key with a given function.
 The given function gets the current value as a parameter and its return value
 determines if the value is updated or removed. New key-value pairs can be
@@ -468,16 +468,14 @@ map f dict =
 -}
 filter : (comparable -> v -> Bool) -> Dict comparable v -> Dict comparable v
 filter predicate dict =
-    foldr
-        (\key value list ->
+    let
+        helper key value list =
             if predicate key value then
                 ( key, value ) :: list
             else
                 list
-        )
-        []
-        dict
-        |> fromSortedList True
+    in
+        fromSortedList True (foldr helper [] dict)
 
 
 {-| Fold over the key-value pairs in a dictionary, in order from lowest
@@ -513,18 +511,16 @@ contains the rest.
 partition : (comparable -> v -> Bool) -> Dict comparable v -> ( Dict comparable v, Dict comparable v )
 partition predicate dict =
     let
-        ( list1, list2 ) =
-            foldr
-                (\key value ( list1, list2 ) ->
-                    if predicate key value then
-                        ( ( key, value ) :: list1, list2 )
-                    else
-                        ( list1, ( key, value ) :: list2 )
-                )
-                ( [], [] )
-                dict
+        helper key value ( trues, falses ) =
+            if predicate key value then
+                ( ( key, value ) :: trues, falses )
+            else
+                ( trues, ( key, value ) :: falses )
+
+        ( trues, falses ) =
+            foldr helper ( [], [] ) dict
     in
-        ( fromSortedList True list1, fromSortedList True list2 )
+        ( fromSortedList True trues, fromSortedList True falses )
 
 
 
@@ -544,7 +540,11 @@ union left right =
             right
 
         _ ->
-            foldl unionAccumulator ( [], toList right ) left |> uncurry (List.foldl (::)) |> fromSortedList False
+            let
+                ( lt, gt ) =
+                    foldl unionAccumulator ( [], toList right ) left
+            in
+                fromSortedList False (List.foldl (\e acc -> e :: acc) lt gt)
 
 
 unionAccumulator : comparable -> v -> ( List ( comparable, v ), List ( comparable, v ) ) -> ( List ( comparable, v ), List ( comparable, v ) )
@@ -554,12 +554,15 @@ unionAccumulator lKey lVal ( result, rList ) =
             ( ( lKey, lVal ) :: result, [] )
 
         ( rKey, rVal ) :: rRest ->
-            if lKey == rKey then
-                ( ( lKey, lVal ) :: result, rRest )
-            else if lKey < rKey then
-                ( ( lKey, lVal ) :: result, rList )
-            else
-                ( ( rKey, rVal ) :: result, rRest ) |> unionAccumulator lKey lVal
+            case compare lKey rKey of
+                LT ->
+                    ( ( lKey, lVal ) :: result, rList )
+
+                GT ->
+                    unionAccumulator lKey lVal ( ( rKey, rVal ) :: result, rRest )
+
+                EQ ->
+                    ( ( lKey, lVal ) :: result, rRest )
 
 
 {-| Keep a key-value pair when its key appears in the second dictionary.
@@ -579,7 +582,8 @@ intersect left right =
                 -- disjoint ranges
                 empty
             else
-                foldl intersectAccumulator ( [], toList right ) left |> Tuple.first |> fromSortedList False
+                fromSortedList False
+                    (Tuple.first (foldl intersectAccumulator ( [], toList right ) left))
 
 
 intersectAccumulator : comparable -> v -> ( List ( comparable, v ), List ( comparable, v ) ) -> ( List ( comparable, v ), List ( comparable, v ) )
@@ -589,12 +593,15 @@ intersectAccumulator lKey lVal (( result, rList ) as return) =
             return
 
         ( rKey, rVal ) :: rRest ->
-            if lKey == rKey then
-                ( ( lKey, lVal ) :: result, rRest )
-            else if lKey < rKey then
-                return
-            else
-                ( result, rRest ) |> intersectAccumulator lKey lVal
+            case compare lKey rKey of
+                LT ->
+                    return
+
+                GT ->
+                    intersectAccumulator lKey lVal ( result, rRest )
+
+                EQ ->
+                    ( ( lKey, lVal ) :: result, rRest )
 
 
 {-| Keep a key-value pair when its key does not appear in the second dictionary.
@@ -613,7 +620,8 @@ diff left right =
                 -- disjoint ranges
                 left
             else
-                foldl diffAccumulator ( [], toList right ) left |> Tuple.first |> fromSortedList False
+                fromSortedList False
+                    (Tuple.first (foldl diffAccumulator ( [], toList right ) left))
 
 
 diffAccumulator : comparable -> v -> ( List ( comparable, v ), List ( comparable, v ) ) -> ( List ( comparable, v ), List ( comparable, v ) )
@@ -623,12 +631,15 @@ diffAccumulator lKey lVal ( result, rList ) =
             ( ( lKey, lVal ) :: result, [] )
 
         ( rKey, rVal ) :: rRest ->
-            if lKey == rKey then
-                ( result, rRest )
-            else if lKey < rKey then
-                ( ( lKey, lVal ) :: result, rList )
-            else
-                ( result, rRest ) |> diffAccumulator lKey lVal
+            case compare lKey rKey of
+                LT ->
+                    ( ( lKey, lVal ) :: result, rList )
+
+                GT ->
+                    diffAccumulator lKey lVal ( result, rRest )
+
+                EQ ->
+                    ( result, rRest )
 
 
 getRange : Dict comparable v -> Maybe ( comparable, comparable )
@@ -709,7 +720,7 @@ keys (fromList [(0,"Alice"),(1,"Bob")]) == [0,1]
 -}
 keys : Dict k v -> List k
 keys dict =
-    foldr (\key value keyList -> key :: keyList) [] dict
+    foldr (\key _ keyList -> key :: keyList) [] dict
 
 
 {-| Get all of the values in a dictionary, in the order of their keys.
@@ -717,7 +728,7 @@ values (fromList [(0,"Alice"),(1,"Bob")]) == ["Alice", "Bob"]
 -}
 values : Dict k v -> List v
 values dict =
-    foldr (\key value valueList -> value :: valueList) [] dict
+    foldr (\_ value valueList -> value :: valueList) [] dict
 
 
 {-| Convert a dictionary into an association list of key-value pairs, sorted by keys.
@@ -739,7 +750,7 @@ fromList list =
             in
                 List.foldl
                     (\( k, v ) dict -> insert k v dict)
-                    (sorted |> fromSortedList False)
+                    (fromSortedList False sorted)
                     remainder
 
         [] ->
@@ -771,7 +782,7 @@ fromSortedList isAsc list =
             Leaf
 
         pair :: rest ->
-            sortedListToNodeList isAsc [] pair rest |> fromNodeList isAsc
+            fromNodeList isAsc (sortedListToNodeList isAsc [] pair rest)
 
 
 {-| Represents a non-empty list of nodes separated by key-value pairs.
@@ -815,8 +826,8 @@ fromNodeList isReversed nodeList =
             node
 
         ( a, ( p1, b ) :: list ) ->
-            accumulateNodeList isReversed [] a p1 b list
-                |> fromNodeList (not isReversed)
+            fromNodeList (not isReversed)
+                (accumulateNodeList isReversed [] a p1 b list)
 
 
 {-| Gather up a NodeList to the next level. (reverses order)
@@ -847,10 +858,6 @@ accumulateNodeList isReversed revList a p1 b list =
                 accumulateNodeList isReversed (( p3, node3 c p2 b p1 a ) :: revList) d p4 e rest
             else
                 accumulateNodeList isReversed (( p3, node3 a p1 b p2 c ) :: revList) d p4 e rest
-
-
-
--- node constructors
 
 
 node2 : Dict k v -> ( k, v ) -> Dict k v -> Dict k v
