@@ -795,25 +795,25 @@ type alias NodeList k v =
 by key-value pairs. (reverses order)
 -}
 sortedListToNodeList : Bool -> List ( ( k, v ), Dict k v ) -> ( k, v ) -> List ( k, v ) -> NodeList k v
-sortedListToNodeList isAsc revList p1 list =
+sortedListToNodeList isAsc revList ( k1, v1 ) list =
     case list of
         [] ->
-            ( node2 Leaf p1 Leaf, revList )
+            ( Node Black k1 v1 Leaf Leaf, revList )
 
-        p2 :: [] ->
+        ( k2, v2 ) :: [] ->
             if isAsc then
-                ( node3 Leaf p1 Leaf p2 Leaf, revList )
+                ( Node Black k2 v2 (Node Red k1 v1 Leaf Leaf) Leaf, revList )
             else
-                ( node3 Leaf p2 Leaf p1 Leaf, revList )
+                ( Node Black k1 v1 (Node Red k2 v2 Leaf Leaf) Leaf, revList )
 
-        p2 :: p3 :: [] ->
-            ( node2 Leaf p3 Leaf, ( p2, node2 Leaf p1 Leaf ) :: revList )
+        p2 :: ( k3, v3 ) :: [] ->
+            ( Node Black k3 v3 Leaf Leaf, ( p2, Node Black k1 v1 Leaf Leaf ) :: revList )
 
-        p2 :: p3 :: p4 :: rest ->
+        ( k2, v2 ) :: p3 :: p4 :: rest ->
             if isAsc then
-                sortedListToNodeList isAsc (( p3, node3 Leaf p1 Leaf p2 Leaf ) :: revList) p4 rest
+                sortedListToNodeList isAsc (( p3, Node Black k2 v2 (Node Red k1 v1 Leaf Leaf) Leaf ) :: revList) p4 rest
             else
-                sortedListToNodeList isAsc (( p3, node3 Leaf p2 Leaf p1 Leaf ) :: revList) p4 rest
+                sortedListToNodeList isAsc (( p3, Node Black k1 v1 (Node Red k2 v2 Leaf Leaf) Leaf ) :: revList) p4 rest
 
 
 {-| Gather up a NodeList one level at a time, in successive passes of alternating
@@ -833,41 +833,31 @@ fromNodeList isReversed nodeList =
 {-| Gather up a NodeList to the next level. (reverses order)
 -}
 accumulateNodeList : Bool -> List ( ( k, v ), Dict k v ) -> Dict k v -> ( k, v ) -> Dict k v -> List ( ( k, v ), Dict k v ) -> NodeList k v
-accumulateNodeList isReversed revList a p1 b list =
+accumulateNodeList isReversed revList a ( k1, v1 ) b list =
     case list of
         [] ->
             if isReversed then
-                ( node2 b p1 a, revList )
+                ( Node Black k1 v1 b a, revList )
             else
-                ( node2 a p1 b, revList )
+                ( Node Black k1 v1 a b, revList )
 
-        ( p2, c ) :: [] ->
+        ( ( k2, v2 ), c ) :: [] ->
             if isReversed then
-                ( node3 c p2 b p1 a, revList )
+                ( Node Black k1 v1 (Node Red k2 v2 c b) a, revList )
             else
-                ( node3 a p1 b p2 c, revList )
+                ( Node Black k2 v2 (Node Red k1 v1 a b) c, revList )
 
-        ( p2, c ) :: ( p3, d ) :: [] ->
+        ( p2, c ) :: ( ( k3, v3 ), d ) :: [] ->
             if isReversed then
-                ( node2 d p3 c, ( p2, node2 b p1 a ) :: revList )
+                ( Node Black k3 v3 d c, ( p2, Node Black k1 v1 b a ) :: revList )
             else
-                ( node2 c p3 d, ( p2, node2 a p1 b ) :: revList )
+                ( Node Black k3 v3 c d, ( p2, Node Black k1 v1 a b ) :: revList )
 
-        ( p2, c ) :: ( p3, d ) :: ( p4, e ) :: rest ->
+        ( ( k2, v2 ), c ) :: ( p3, d ) :: ( p4, e ) :: rest ->
             if isReversed then
-                accumulateNodeList isReversed (( p3, node3 c p2 b p1 a ) :: revList) d p4 e rest
+                accumulateNodeList isReversed (( p3, Node Black k1 v1 (Node Red k2 v2 c b) a ) :: revList) d p4 e rest
             else
-                accumulateNodeList isReversed (( p3, node3 a p1 b p2 c ) :: revList) d p4 e rest
-
-
-node2 : Dict k v -> ( k, v ) -> Dict k v -> Dict k v
-node2 a ( k1, v1 ) b =
-    Node Black k1 v1 a b
-
-
-node3 : Dict k v -> ( k, v ) -> Dict k v -> ( k, v ) -> Dict k v -> Dict k v
-node3 a ( k1, v1 ) b ( k2, v2 ) c =
-    Node Black k2 v2 (Node Red k1 v1 a b) c
+                accumulateNodeList isReversed (( p3, Node Black k2 v2 (Node Red k1 v1 a b) c ) :: revList) d p4 e rest
 
 
 
