@@ -276,8 +276,8 @@ removeHelp targetKey dict =
 
                             _ ->
                                 case moveRedLeft dict of
-                                    Node color key value left right ->
-                                        balance color key value (removeHelp targetKey left) right
+                                    Node nColor nKey nValue nLeft nRight ->
+                                        balance nColor nKey nValue (removeHelp targetKey nLeft) nRight
 
                                     Leaf ->
                                         Leaf
@@ -354,8 +354,8 @@ removeMin dict =
 
                         _ ->
                             case moveRedLeft dict of
-                                Node color key value left right ->
-                                    balance color key value (removeMin left) right
+                                Node nColor nKey nValue nLeft nRight ->
+                                    balance nColor nKey nValue (removeMin nLeft) nRight
 
                                 Leaf ->
                                     Leaf
@@ -511,11 +511,11 @@ contains the rest.
 partition : (comparable -> v -> Bool) -> Dict comparable v -> ( Dict comparable v, Dict comparable v )
 partition predicate dict =
     let
-        helper key value ( trues, falses ) =
+        helper key value ( ts, fs ) =
             if predicate key value then
-                ( ( key, value ) :: trues, falses )
+                ( ( key, value ) :: ts, fs )
             else
-                ( trues, ( key, value ) :: falses )
+                ( ts, ( key, value ) :: fs )
 
         ( trues, falses ) =
             foldr helper ( [], [] ) dict
@@ -882,8 +882,8 @@ isBST dict =
 
 
 isBSTHelper : Bool -> List comparable -> Bool
-isBSTHelper acc keys =
-    case keys of
+isBSTHelper acc ks =
+    case ks of
         [] ->
             acc
 
