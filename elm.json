@@ -3,7 +3,7 @@
     "name": "Skinney/elm-dict-exploration",
     "summary": "Exploring a new Dict implementation",
     "license": "MIT",
-    "version": "1.0.5",
+    "version": "1.0.6",
     "exposed-modules": [
         "Dict.LLRB"
     ],
