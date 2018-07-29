@@ -23,7 +23,7 @@ module Dict.LLRB
         , values
         , toList
         , fromList
-          --, validateInvariants
+          -- , validateInvariants
         )
 
 {-| A dictionary mapping unique keys to values. The keys can be any comparable
@@ -469,13 +469,13 @@ map f dict =
 filter : (comparable -> v -> Bool) -> Dict comparable v -> Dict comparable v
 filter predicate dict =
     let
-        helper key value acc =
+        helper key value list =
             if predicate key value then
-                insert key value acc
+                ( key, value ) :: list
             else
-                acc
+                list
     in
-        foldr helper empty dict
+        fromSortedList True (foldr helper [] dict)
 
 
 {-| Fold over the key-value pairs in a dictionary, in order from lowest
@@ -513,11 +513,14 @@ partition predicate dict =
     let
         helper key value ( ts, fs ) =
             if predicate key value then
-                ( insert key value ts, fs )
+                ( ( key, value ) :: ts, fs )
             else
-                ( ts, insert key value fs )
+                ( ts, ( key, value ) :: fs )
+
+        ( trues, falses ) =
+            foldr helper ( [], [] ) dict
     in
-        foldr helper ( empty, empty ) dict
+        ( fromSortedList True trues, fromSortedList True falses )
 
 
 
@@ -529,7 +532,37 @@ to the first dictionary.
 -}
 union : Dict comparable v -> Dict comparable v -> Dict comparable v
 union left right =
-    foldl insert right left
+    case ( left, right ) of
+        ( _, Leaf ) ->
+            left
+
+        ( Leaf, _ ) ->
+            right
+
+        _ ->
+            let
+                ( lt, gt ) =
+                    foldl unionAccumulator ( [], toList right ) left
+            in
+                fromSortedList False (List.foldl (\e acc -> e :: acc) lt gt)
+
+
+unionAccumulator : comparable -> v -> ( List ( comparable, v ), List ( comparable, v ) ) -> ( List ( comparable, v ), List ( comparable, v ) )
+unionAccumulator lKey lVal ( result, rList ) =
+    case rList of
+        [] ->
+            ( ( lKey, lVal ) :: result, [] )
+
+        ( rKey, rVal ) :: rRest ->
+            case compare lKey rKey of
+                LT ->
+                    ( ( lKey, lVal ) :: result, rList )
+
+                GT ->
+                    unionAccumulator lKey lVal ( ( rKey, rVal ) :: result, rRest )
+
+                EQ ->
+                    ( ( lKey, lVal ) :: result, rRest )
 
 
 {-| Keep a key-value pair when its key appears in the second dictionary.
@@ -537,14 +570,106 @@ Preference is given to values in the first dictionary.
 -}
 intersect : Dict comparable v -> Dict comparable v -> Dict comparable v
 intersect left right =
-    filter (\k _ -> member k right) left
+    case ( getRange left, getRange right ) of
+        ( _, Nothing ) ->
+            empty
+
+        ( Nothing, _ ) ->
+            empty
+
+        ( Just ( lMin, lMax ), Just ( rMin, rMax ) ) ->
+            if lMax < rMin || rMax < lMin then
+                -- disjoint ranges
+                empty
+            else
+                fromSortedList False
+                    (Tuple.first (foldl intersectAccumulator ( [], toList right ) left))
+
+
+intersectAccumulator : comparable -> v -> ( List ( comparable, v ), List ( comparable, v ) ) -> ( List ( comparable, v ), List ( comparable, v ) )
+intersectAccumulator lKey lVal (( result, rList ) as return) =
+    case rList of
+        [] ->
+            return
+
+        ( rKey, rVal ) :: rRest ->
+            case compare lKey rKey of
+                LT ->
+                    return
+
+                GT ->
+                    intersectAccumulator lKey lVal ( result, rRest )
+
+                EQ ->
+                    ( ( lKey, lVal ) :: result, rRest )
 
 
 {-| Keep a key-value pair when its key does not appear in the second dictionary.
 -}
 diff : Dict comparable v -> Dict comparable v -> Dict comparable v
 diff left right =
-    foldl (\k v t -> remove k t) left right
+    case ( getRange left, getRange right ) of
+        ( _, Nothing ) ->
+            left
+
+        ( Nothing, _ ) ->
+            empty
+
+        ( Just ( lMin, lMax ), Just ( rMin, rMax ) ) ->
+            if lMax < rMin || rMax < lMin then
+                -- disjoint ranges
+                left
+            else
+                fromSortedList False
+                    (Tuple.first (foldl diffAccumulator ( [], toList right ) left))
+
+
+diffAccumulator : comparable -> v -> ( List ( comparable, v ), List ( comparable, v ) ) -> ( List ( comparable, v ), List ( comparable, v ) )
+diffAccumulator lKey lVal ( result, rList ) =
+    case rList of
+        [] ->
+            ( ( lKey, lVal ) :: result, [] )
+
+        ( rKey, rVal ) :: rRest ->
+            case compare lKey rKey of
+                LT ->
+                    ( ( lKey, lVal ) :: result, rList )
+
+                GT ->
+                    diffAccumulator lKey lVal ( result, rRest )
+
+                EQ ->
+                    ( result, rRest )
+
+
+getRange : Dict comparable v -> Maybe ( comparable, comparable )
+getRange dict =
+    case dict of
+        Leaf ->
+            Nothing
+
+        Node _ key _ left right ->
+            Just ( getMinKeyHelp key left, getMaxKeyHelp key right )
+
+
+getMinKeyHelp : comparable -> Dict comparable v -> comparable
+getMinKeyHelp minKey dict =
+    case dict of
+        Leaf ->
+            minKey
+
+        Node _ newMinKey _ left _ ->
+            getMinKeyHelp newMinKey left
+
+
+getMaxKeyHelp : comparable -> Dict comparable v -> comparable
+getMaxKeyHelp maxKey dict =
+    case dict of
+        Leaf ->
+            maxKey
+
+        Node _ newMaxKey _ _ right ->
+            getMaxKeyHelp newMaxKey right
 
 
 {-| The most general way of combining two dictionaries. You provide three
@@ -617,7 +742,122 @@ toList dict =
 -}
 fromList : List ( comparable, v ) -> Dict comparable v
 fromList list =
-    List.foldl (\( key, value ) dict -> insert key value dict) empty list
+    case list of
+        pair :: rest ->
+            let
+                ( sorted, remainder ) =
+                    splitSortedHelp [] pair rest
+            in
+                List.foldl
+                    (\( k, v ) dict -> insert k v dict)
+                    (fromSortedList False sorted)
+                    remainder
+
+        [] ->
+            empty
+
+
+{-| Split a list into its sorted prefix and the remainder. The sorted prefix
+is returned in reversed order.
+-}
+splitSortedHelp : List ( comparable, v ) -> ( comparable, v ) -> List ( comparable, v ) -> ( List ( comparable, v ), List ( comparable, v ) )
+splitSortedHelp sorted (( k1, _ ) as p1) list =
+    case list of
+        (( k2, _ ) as p2) :: rest ->
+            if k1 < k2 then
+                splitSortedHelp (p1 :: sorted) p2 rest
+            else
+                ( sorted, p1 :: list )
+
+        [] ->
+            ( p1 :: sorted, [] )
+
+
+{-| Convert an association list with sorted and distinct keys into a dictionary.
+-}
+fromSortedList : Bool -> List ( k, v ) -> Dict k v
+fromSortedList isAsc list =
+    case list of
+        [] ->
+            Leaf
+
+        pair :: rest ->
+            fromNodeList isAsc (sortedListToNodeList isAsc [] pair rest)
+
+
+{-| Represents a non-empty list of nodes separated by key-value pairs.
+-}
+type alias NodeList k v =
+    ( Dict k v, List ( ( k, v ), Dict k v ) )
+
+
+{-| Convert a non-empty association list to the bottom level of nodes separated
+by key-value pairs. (reverses order)
+-}
+sortedListToNodeList : Bool -> List ( ( k, v ), Dict k v ) -> ( k, v ) -> List ( k, v ) -> NodeList k v
+sortedListToNodeList isAsc revList ( k1, v1 ) list =
+    case list of
+        [] ->
+            ( Node Black k1 v1 Leaf Leaf, revList )
+
+        ( k2, v2 ) :: [] ->
+            if isAsc then
+                ( Node Black k2 v2 (Node Red k1 v1 Leaf Leaf) Leaf, revList )
+            else
+                ( Node Black k1 v1 (Node Red k2 v2 Leaf Leaf) Leaf, revList )
+
+        p2 :: ( k3, v3 ) :: [] ->
+            ( Node Black k3 v3 Leaf Leaf, ( p2, Node Black k1 v1 Leaf Leaf ) :: revList )
+
+        ( k2, v2 ) :: p3 :: p4 :: rest ->
+            if isAsc then
+                sortedListToNodeList isAsc (( p3, Node Black k2 v2 (Node Red k1 v1 Leaf Leaf) Leaf ) :: revList) p4 rest
+            else
+                sortedListToNodeList isAsc (( p3, Node Black k1 v1 (Node Red k2 v2 Leaf Leaf) Leaf ) :: revList) p4 rest
+
+
+{-| Gather up a NodeList one level at a time, in successive passes of alternating
+direction, until a single root-node remains.
+-}
+fromNodeList : Bool -> NodeList k v -> Dict k v
+fromNodeList isReversed nodeList =
+    case nodeList of
+        ( node, [] ) ->
+            node
+
+        ( a, ( p1, b ) :: list ) ->
+            fromNodeList (not isReversed)
+                (accumulateNodeList isReversed [] a p1 b list)
+
+
+{-| Gather up a NodeList to the next level. (reverses order)
+-}
+accumulateNodeList : Bool -> List ( ( k, v ), Dict k v ) -> Dict k v -> ( k, v ) -> Dict k v -> List ( ( k, v ), Dict k v ) -> NodeList k v
+accumulateNodeList isReversed revList a ( k1, v1 ) b list =
+    case list of
+        [] ->
+            if isReversed then
+                ( Node Black k1 v1 b a, revList )
+            else
+                ( Node Black k1 v1 a b, revList )
+
+        ( ( k2, v2 ), c ) :: [] ->
+            if isReversed then
+                ( Node Black k1 v1 (Node Red k2 v2 c b) a, revList )
+            else
+                ( Node Black k2 v2 (Node Red k1 v1 a b) c, revList )
+
+        ( p2, c ) :: ( ( k3, v3 ), d ) :: [] ->
+            if isReversed then
+                ( Node Black k3 v3 d c, ( p2, Node Black k1 v1 b a ) :: revList )
+            else
+                ( Node Black k3 v3 c d, ( p2, Node Black k1 v1 a b ) :: revList )
+
+        ( ( k2, v2 ), c ) :: ( p3, d ) :: ( p4, e ) :: rest ->
+            if isReversed then
+                accumulateNodeList isReversed (( p3, Node Black k1 v1 (Node Red k2 v2 c b) a ) :: revList) d p4 e rest
+            else
+                accumulateNodeList isReversed (( p3, Node Black k2 v2 (Node Red k1 v1 a b) c ) :: revList) d p4 e rest
 
 
 
